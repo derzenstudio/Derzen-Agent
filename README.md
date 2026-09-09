@@ -1,424 +1,139 @@
-# AI Automation Hub - Complete System
+# DERZEN
 
-A centralized, locally-hosted AI agent system with visual pipeline builder, Chrome automation, offline AI models, and WhatsApp/Email communication. Built for Windows with comprehensive security hardening.
+**Still and always be DERZEN.**
 
-## 🎯 Key Features
+DERZEN is a locally-hosted AI automation system for Windows. It combines browser
+automation, offline AI processing, social-media analysis, and multi-channel
+communication behind a visual, no-code pipeline builder. Everything runs on your
+own machine, so your data never leaves it.
 
-### Security Hardened
-- **No Hardcoded Values** - All configuration from environment variables
-- **File Sandboxing** - All operations restricted to configured directory
-- **Whitelist Enforcement** - Only approved contacts can trigger actions
-- **Emergency Stop** - One-click halt of all automation
-- **Path Traversal Protection** - Prevents unauthorized file access
+The project has two parts:
 
-### Visual Pipeline Builder
-- **Drag-and-Drop Interface** - Create pipelines visually without coding
-- **9 Node Types** - Start, End, AI Query, Web Scrape, Email, WhatsApp, File Save, Wait, Branch
-- **Branching Logic** - If/else conditional paths
-- **AI-Generated Pipelines** - Describe what you want in plain English
-- **Save & Run** - Store pipelines and execute them on demand or on schedule
+- **backend/** — a Python (FastAPI) service that does the real work: Ollama
+  inference, Playwright browser automation, IMAP/SMTP email, WhatsApp Web,
+  sandboxed file operations, cron scheduling, and pipeline execution.
+- **src/** — a React + Vite front-end (the dashboard, visual pipeline builder,
+  file manager, and scheduler) that talks to the backend over HTTP.
 
-### Core Capabilities
-- **Browser Automation** - Chrome control via Playwright
-- **Local AI** - Ollama integration for offline inference
-- **Email Monitoring** - IMAP-based inbox listening
-- **WhatsApp Automation** - WhatsApp Web integration
-- **Task Scheduling** - Cron-based job execution
-- **File Management** - Sandboxed file operations
+---
 
-## 📊 Performance (16GB RAM, No GPU)
+## Requirements
 
-| Task | Time | Notes |
-|------|------|-------|
-| AI Query (short) | 8-15s | ~50 tokens @ 5-10 tok/s |
-| AI Analysis (50 items) | 2-4 min | Main bottleneck |
-| Report Summary | 30-60s | ~500 tokens |
-| **Full Pipeline** | **15-25 min** | All steps combined |
-
-**Optimization:** Use smaller models (phi-2, tinyllama) for 2-3x speed, or add NVIDIA GPU for 80-90% reduction.
-
-## 🚀 Quick Start
-
-### 1. Prerequisites
-- Windows 10/11 with 16GB+ RAM
+- Windows 10/11 (Linux/macOS also work for development)
 - Python 3.10+
-- Administrator access
-- Gmail account with App Password
-- WhatsApp account
+- Node.js 18+
+- [Ollama](https://ollama.ai) for local AI inference
 
-### 2. Installation
+## 1. Backend setup
 
 ```bash
-# Clone or download project
-cd AI_Automation_Hub
-
-# Create virtual environment
+cd backend
 python -m venv venv
-venv\Scripts\activate
-
-# Install dependencies
+venv\Scripts\activate            # Windows (use: source venv/bin/activate on macOS/Linux)
 pip install -r requirements.txt
-
-# Install Playwright browsers
 playwright install chromium
+
+copy .env.example .env           # then edit .env (see below)
+python main.py                   # starts the API on http://localhost:8000
 ```
 
-### 3. Install Ollama
+### Configuring .env
 
-Download from https://ollama.ai and install, then:
+Two values are **required** and have no defaults, for security:
+
+- `WHITELIST_CONTACTS` — only these emails / phone numbers may trigger actions.
+- `ALLOWED_BASE` — the single root directory every file operation is sandboxed to.
+
+Email and WhatsApp are optional. Enter your own credentials in `.env`;
+they are read from the environment and never stored in code.
+
+## 2. Local AI (Ollama)
 
 ```bash
 ollama pull llama3.2
 ollama serve
 ```
 
-### 4. Configure Environment
-
-Copy `.env.example` to `.env` and fill in ALL required values:
-
-```env
-# SECURITY: REQUIRED - No defaults for security
-WHITELIST_CONTACTS=admin@company.com,manager@company.com
-ALLOWED_BASE=C:/AI_Automation
-
-# Server
-HOST=127.0.0.1
-PORT=8000
-
-# Email (optional - leave empty to disable)
-EMAIL_SENDER=your-agent@gmail.com
-EMAIL_PASSWORD=your-app-password
-
-# WhatsApp (set to true to enable)
-WHATSAPP_ENABLED=false
-
-# AI
-AI_BACKEND=ollama
-DEFAULT_MODEL=llama3.2
-```
-
-**Important:** 
-- `WHITELIST_CONTACTS` - Only these contacts can trigger actions
-- `ALLOWED_BASE` - All file operations restricted here
-- No default values for security reasons
-
-### 5. Create Runtime Directories
+## 3. Frontend setup
 
 ```bash
-mkdir C:\AI_Automation
-mkdir C:\AI_Automation\Downloads
-mkdir C:\AI_Automation\Reports
-mkdir C:\AI_Automation\Models
-mkdir C:\AI_Automation\Assets
-mkdir C:\AI_Automation\Logs
-mkdir C:\AI_Automation\Pipelines
-mkdir C:\AI_Automation\BrowserData
+npm install
+npm run dev                      # serves the UI on http://localhost:3000
 ```
 
-### 6. First Run
+Open http://localhost:3000. The UI reads the backend URL from the `VITE_API_BASE`
+environment variable and defaults to `http://localhost:8000`.
 
-```bash
-# Terminal 1: Start Ollama
-ollama serve
+---
 
-# Terminal 2: Start AI Hub
-python main.py
-```
+## Visual pipeline builder
 
-Open browser to `http://localhost:8000`
+Build automations by connecting nodes on a canvas — no coding required. You can
+start from scratch, or describe what you want in plain English and let the local
+AI draft the pipeline for you (with a deterministic fallback if the AI is
+offline). Use `{{node_id}}` or friendly names like `{{ai_answer}}` /
+`{{scraped_data}}` to pass results from one step to the next.
 
-Scan WhatsApp QR code when prompted (if enabled).
+### Node types
 
-## 🎨 Visual Pipeline Builder
+| Node | Purpose |
+| --- | --- |
+| Start / End | Pipeline entry and exit |
+| Ask Local AI | Query Ollama offline |
+| Browse Online AI | Drive ChatGPT / Claude / Gemini / Perplexity via the browser |
+| Read Websites | Scrape one or more URLs |
+| Analyze Social Media | Search a platform and summarise sentiment |
+| Send an Email | Send a report/alert over SMTP |
+| WhatsApp | Send a message via WhatsApp Web |
+| File Save | Write a file into the sandbox |
+| Wait | Pause for N seconds |
+| Branch | Conditional true/false paths |
 
-### Creating a Pipeline
+## Security model
 
-1. **Navigate to Pipeline Builder** from the dashboard
-2. **Describe your pipeline** in the prompt box:
-   - "Scrape news sites, analyze with AI, send email if results found"
-   - "Research AI trends, create report, send via WhatsApp"
-3. **Click Generate** - AI creates the pipeline structure
-4. **Drag and drop nodes** from the left palette
-5. **Connect nodes** by clicking output ports (right) then input ports (left)
-6. **Configure nodes** by clicking them and editing properties
-7. **Save** the pipeline with a name
-8. **Run** the pipeline immediately or schedule it
+- **Sandboxing** — every file path is validated against `ALLOWED_BASE`; traversal is refused.
+- **Whitelist** — inbound email/WhatsApp senders are checked before any action runs.
+- **Emergency stop** — one call halts the scheduler, tears down the browser, and refuses new work until reset.
+- **No hardcoded secrets** — all configuration comes from `.env`.
+- **Localhost binding & CORS** — the API binds to `127.0.0.1` and only accepts the configured origin.
 
-### Node Types
+## API endpoints (backend)
 
-| Node | Purpose | Config |
-|------|---------|--------|
-| **START** | Pipeline entry | None |
-| **END** | Pipeline exit | None |
-| **AI QUERY** | Send prompt to AI | `prompt` |
-| **WEB SCRAPE** | Scrape URLs | `urls` |
-| **EMAIL SEND** | Send email | `to`, `subject`, `body` |
-| **WHATSAPP** | Send WhatsApp | `contact`, `message` |
-| **FILE SAVE** | Save to file | `filename`, `content` |
-| **WAIT** | Pause execution | `seconds` |
-| **BRANCH** | Conditional logic | `condition` (true/false paths) |
+- `GET  /api/status` — system + AI status
+- `POST /api/emergency-stop` / `POST /api/emergency-stop/reset`
+- `POST /api/ai/query`
+- `GET/POST /api/pipelines`, `GET/DELETE /api/pipelines/{id}`, `POST /api/pipelines/{id}/run`, `POST /api/pipelines/run`, `POST /api/pipelines/generate`
+- `GET  /api/scheduler/jobs`
+- `GET  /api/files/list`
 
-### Variable Substitution
-
-Use `{{variable}}` syntax to reference previous node results:
-
-```
-Node: AI QUERY
-Config: prompt = "Analyze {{scraped_data}}"
-
-Node: EMAIL SEND
-Config: body = "Report: {{ai_response}}"
-```
-
-### Branching Example
+## Project structure
 
 ```
-START → WEB SCRAPE → AI QUERY → BRANCH
-                                    ↓         ↓
-                              (true)         (false)
-                                  ↓              ↓
-                            EMAIL SEND       WAIT 10s
-                                  ↓              ↓
-                                  └──────→ END ←─┘
+backend/                 Python FastAPI service
+  main.py                API entry point (python main.py)
+  config.py              env-based configuration + sandbox base
+  runtime.py             shared emergency-stop flag
+  ai_manager.py          Ollama client
+  automation.py          Playwright browser automation
+  social.py              social-media search + sentiment
+  email_listener.py      SMTP send + whitelisted IMAP polling
+  whatsapp_listener.py   WhatsApp Web integration
+  file_manager.py        sandboxed file operations
+  storage.py             pipeline persistence (JSON)
+  pipeline_runner.py     execution engine (vars + branching)
+  scheduler.py           APScheduler cron jobs
+  generator.py           plain-English -> pipeline
+  requirements.txt
+  .env.example
+src/                     React + Vite frontend
+  api.ts                 backend API client
+  App.tsx, components/   dashboard, builder, scheduler, files, ...
 ```
 
-Branch condition: `{{ai_response}} != ""`
+## Notes & limitations
 
-## 🔒 Security Features
-
-### 1. File Sandboxing
-
-All file operations validated against `ALLOWED_BASE`:
-
-```python
-def validate_path(requested_path: str) -> Path:
-    resolved = (ALLOWED_BASE / requested_path).resolve()
-    if not str(resolved).startswith(str(ALLOWED_BASE)):
-        raise SecurityError(f"Access denied: {requested_path}")
-    return resolved
-```
-
-**Blocked:**
-- `../Windows/System32` - Path traversal
-- `../../etc/passwd` - Path traversal
-- `C:/Windows/System32` - Outside sandbox
-
-### 2. Whitelist Enforcement
-
-Only whitelisted contacts can trigger actions:
-
-```python
-def is_whitelisted(contact: str) -> bool:
-    whitelist = os.getenv("WHITELIST_CONTACTS", "").split(",")
-    return contact.strip().lower() in [w.strip().lower() for w in whitelist]
-```
-
-Unauthorized senders are logged but ignored.
-
-### 3. Emergency Stop
-
-One-click halt of all automation:
-
-```python
-@app.post("/api/emergency-stop")
-async def trigger_emergency_stop():
-    emergency_stop.set()
-    scheduler.shutdown(wait=False)
-    await browser.cleanup()
-    email_listener.stop()
-    whatsapp_listener.stop()
-```
-
-## 📁 Project Structure
-
-```
-AI_Automation_Hub/
-├── src/                          # Frontend (React)
-│   ├── App.tsx                   # Main app
-│   ├── components/
-│   │   ├── Dashboard.tsx         # Card navigation
-│   │   ├── PipelineBuilder.tsx   # Visual pipeline editor
-│   │   ├── CodeViewer.tsx        # Source code browser
-│   │   ├── SetupGuide.tsx        # Deployment guide
-│   │   ├── FileManager.tsx       # File browser
-│   │   ├── TaskScheduler.tsx     # Job scheduler
-│   │   └── Architecture.tsx      # System diagrams
-│   └── data/
-│       └── projectFiles.ts       # Python code (no hardcoded values)
-├── main.py                       # FastAPI server
-├── pipeline_runner.py            # Pipeline execution engine
-├── automation.py                 # Browser automation
-├── ai_manager.py                 # AI model management
-├── email_listener.py             # Email monitoring
-├── whatsapp_listener.py          # WhatsApp automation
-├── file_manager.py               # Sandboxed file ops
-├── requirements.txt              # Python dependencies
-├── .env.example                  # Environment template
-└── README.md                     # This file
-```
-
-## 🔌 API Endpoints
-
-### System
-- `GET /api/status` - System status
-- `POST /api/emergency-stop` - Halt all automation
-- `POST /api/ai/query?prompt=...` - Query AI model
-
-### Pipelines
-- `GET /api/pipelines` - List all pipelines
-- `POST /api/pipelines` - Save new pipeline
-- `GET /api/pipelines/{id}` - Get pipeline
-- `DELETE /api/pipelines/{id}` - Delete pipeline
-- `POST /api/pipelines/{id}/run` - Run pipeline
-- `POST /api/pipelines/generate?prompt=...` - AI-generate pipeline
-
-### Files
-- `GET /api/files/list?directory=...` - List files (sandboxed)
-- `POST /api/files/upload` - Upload file (sandboxed)
-
-## 🛠️ Technology Stack
-
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| Backend | Python + FastAPI | Web server and API |
-| Frontend | React + Custom CSS | Dashboard UI |
-| Browser | Playwright + Chromium | Chrome automation |
-| AI | Ollama (llama3.2) | Local AI inference |
-| Scheduler | APScheduler | Cron-based scheduling |
-| Email | IMAP/SMTP | Inbox monitoring |
-| Spreadsheets | OpenPyXL | Excel reports |
-
-## 📖 Usage Examples
-
-### Example 1: Weekly Research Pipeline
-
-**Prompt:** "Every Sunday, scrape AI news from arXiv and HuggingFace, analyze trends, create a report, and email it to the team"
-
-**Generated Pipeline:**
-```
-START → WEB SCRAPE (arXiv, HuggingFace)
-      → AI QUERY (analyze trends)
-      → FILE SAVE (report.xlsx)
-      → EMAIL SEND (team@company.com)
-      → END
-```
-
-**Schedule:** `0 9 * * SUN` (Every Sunday at 9 AM)
-
-### Example 2: Conditional Notification
-
-**Prompt:** "Monitor website, if content changed send WhatsApp alert, else wait 1 hour and check again"
-
-**Generated Pipeline:**
-```
-START → WEB SCRAPE (website)
-      → AI QUERY (compare with previous)
-      → BRANCH ({{changed}} == "true")
-          ↓              ↓
-       (true)          (false)
-          ↓              ↓
-    WHATSAPP SEND     WAIT 3600
-          ↓              ↓
-          └──────→ END ←─┘
-```
-
-### Example 3: Data Processing
-
-**Prompt:** "Download CSV file, analyze with AI, if score > 7 send email, else save to review folder"
-
-**Generated Pipeline:**
-```
-START → FILE SAVE (download data.csv)
-      → AI QUERY (analyze and score)
-      → BRANCH ({{score}} > 7)
-          ↓              ↓
-       (true)          (false)
-          ↓              ↓
-    EMAIL SEND      FILE SAVE (review/)
-          ↓              ↓
-          └──────→ END ←─┘
-```
-
-## 🔧 Troubleshooting
-
-### Ollama not responding
-```bash
-ollama list
-taskkill /f /im ollama.exe
-ollama serve
-```
-
-### WhatsApp not connecting
-- Delete `C:\AI_Automation\BrowserData\`
-- Restart system
-- Scan QR code again
-
-### Email not receiving
-- Verify IMAP enabled in Gmail
-- Check App Password (not regular password)
-- Verify whitelist includes your email
-
-### Slow AI performance
-- Switch to smaller model: `ollama pull tinyllama`
-- Close other applications
-- Consider adding NVIDIA GPU
-
-### Pipeline not running
-- Check pipeline has START and END nodes
-- Verify all nodes are connected
-- Check logs: `C:\AI_Automation\Logs\server.log`
-
-## 📝 Environment Variables Reference
-
-### Required (No Defaults)
-- `WHITELIST_CONTACTS` - Comma-separated list of approved contacts
-- `ALLOWED_BASE` - Root directory for all file operations
-
-### Server
-- `HOST` - Server bind address (default: 127.0.0.1)
-- `PORT` - Server port (default: 8000)
-- `DEBUG` - Enable debug mode (default: false)
-- `ALLOWED_ORIGIN` - CORS origin (default: http://localhost:8000)
-
-### Subdirectories (relative to ALLOWED_BASE)
-- `DOWNLOAD_SUBDIR` - Downloads folder (default: Downloads)
-- `REPORTS_SUBDIR` - Reports folder (default: Reports)
-- `MODELS_SUBDIR` - Models folder (default: Models)
-- `ASSETS_SUBDIR` - Assets folder (default: Assets)
-- `LOGS_SUBDIR` - Logs folder (default: Logs)
-- `PIPELINES_SUBDIR` - Pipelines folder (default: Pipelines)
-- `BROWSER_DATA_SUBDIR` - Browser data (default: BrowserData)
-
-### Email (Optional)
-- `EMAIL_SENDER` - Email address
-- `EMAIL_PASSWORD` - App password
-- `IMAP_SERVER` - IMAP server (default: imap.gmail.com)
-- `SMTP_SERVER` - SMTP server (default: smtp.gmail.com)
-
-### WhatsApp
-- `WHATSAPP_ENABLED` - Enable WhatsApp (default: false)
-
-### AI
-- `AI_BACKEND` - AI backend (default: ollama)
-- `DEFAULT_MODEL` - Default model (default: llama3.2)
-- `OLLAMA_URL` - Ollama URL (default: http://localhost:11434)
-
-### Browser
-- `BROWSER_HEADLESS` - Run browser headless (default: false)
-
-## 📄 License
-
-Custom-built automation system for internal use.
-
-## ✅ System Status
-
-- ✅ No hardcoded values
-- ✅ Visual pipeline builder
-- ✅ Branching support
-- ✅ AI-generated pipelines
-- ✅ Security hardening
-- ✅ Complete documentation
-- ✅ Performance estimates
-- ✅ Builds successfully
-
-**Ready for deployment!**
+- Third-party web selectors (online AI sites, social platforms, WhatsApp Web)
+  change over time and may need occasional updates.
+- WhatsApp requires scanning the QR code once; Gmail requires an App Password.
+- CPU-only inference is slower; smaller models (phi-2, tinyllama) trade quality
+  for speed, and an NVIDIA GPU speeds things up substantially.
