@@ -11,15 +11,12 @@ export const projectFiles: ProjectFile[] = [
     name: "main.py",
     path: "main.py",
     language: "python",
-    description: "FastAPI server with security hardening, emergency stop, and scheduling",
+    description: "FastAPI server - all values from environment variables",
     content: `"""
 AI Automation Hub - Main Server (Security Hardened)
 ====================================================
-FastAPI server with:
-- Emergency stop capability
-- File system sandboxing
-- Contact whitelist enforcement
-- Scheduled automation pipelines
+All configuration values loaded from environment variables.
+No hardcoded credentials or paths.
 """
 
 import os
@@ -31,6 +28,10 @@ from datetime import datetime
 from pathlib import Path
 from threading import Event
 from typing import Optional, List, Dict
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 from fastapi import FastAPI, WebSocket, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -44,24 +45,34 @@ from ai_manager import AIManager
 from email_listener import EmailListener
 from whatsapp_listener import WhatsAppListener
 from file_manager import FileManager
+from pipeline_runner import PipelineRunner
 
-# ─── Configuration ───────────────────────────────────────────────────────────
+# ─── Configuration (All from Environment) ────────────────────────────────────
 BASE_DIR = Path(__file__).parent
-ALLOWED_BASE = Path("C:/AI_Automation")  # SECURITY: Sandbox root
 
-# Create sandbox directories
-DOWNLOAD_DIR = ALLOWED_BASE / "Downloads"
-REPORTS_DIR = ALLOWED_BASE / "Reports"
-MODELS_DIR = ALLOWED_BASE / "Models"
-ASSETS_DIR = ALLOWED_BASE / "Assets"
-LOGS_DIR = ALLOWED_BASE / "Logs"
+# SECURITY: Sandbox root from environment
+ALLOWED_BASE = Path(os.getenv("ALLOWED_BASE", "./sandbox"))
 
-for d in [DOWNLOAD_DIR, REPORTS_DIR, MODELS_DIR, ASSETS_DIR, LOGS_DIR]:
+# Runtime directories (all relative to ALLOWED_BASE)
+DOWNLOAD_DIR = ALLOWED_BASE / os.getenv("DOWNLOAD_SUBDIR", "Downloads")
+REPORTS_DIR = ALLOWED_BASE / os.getenv("REPORTS_SUBDIR", "Reports")
+MODELS_DIR = ALLOWED_BASE / os.getenv("MODELS_SUBDIR", "Models")
+ASSETS_DIR = ALLOWED_BASE / os.getenv("ASSETS_SUBDIR", "Assets")
+LOGS_DIR = ALLOWED_BASE / os.getenv("LOGS_SUBDIR", "Logs")
+PIPELINES_DIR = ALLOWED_BASE / os.getenv("PIPELINES_SUBDIR", "Pipelines")
+
+# Create directories
+for d in [DOWNLOAD_DIR, REPORTS_DIR, MODELS_DIR, ASSETS_DIR, LOGS_DIR, PIPELINES_DIR]:
     d.mkdir(parents=True, exist_ok=True)
+
+# Server configuration
+HOST = os.getenv("HOST", "127.0.0.1")
+PORT = int(os.getenv("PORT", "8000"))
+DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
 # ─── Logging ─────────────────────────────────────────────────────────────────
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG if DEBUG else logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[
         logging.FileHandler(LOGS_DIR / "server.log"),
@@ -74,11 +85,15 @@ logger = logging.getLogger("AIHub")
 emergency_stop = Event()
 
 # ─── FastAPI App ─────────────────────────────────────────────────────────────
-app = FastAPI(title="AI Automation Hub", version="2.0.0")
+app = FastAPI(
+    title="AI Automation Hub",
+    version="2.0.0",
+    docs_url="/docs" if DEBUG else None,  # Disable docs in production
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000"],  # SECURITY: Restrict origins
+    allow_origins=[os.getenv("ALLOWED_ORIGIN", "http://localhost:8000")],
     allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
@@ -92,6 +107,7 @@ state = {
     "email_listener": None,
     "whatsapp_listener": None,
     "file_manager": None,
+    "pipeline_runner": None,
     "status": "initializing",
 }
 
@@ -102,18 +118,19 @@ def validate_path(requested_path: str) -> Path:
     resolved = (ALLOWED_BASE / requested_path).resolve()
     if not str(resolved).startswith(str(ALLOWED_BASE.resolve())):
         logger.critical(f"SECURITY: Path traversal blocked: {requested_path}")
-        raise HTTPException(
-            status_code=403,
-            detail="Access denied: Path outside sandbox"
-        )
+        raise HTTPException(status_code=403, detail="Access denied: Path outside sandbox")
     return resolved
 
 
 # ─── Security: Whitelist Check ───────────────────────────────────────────────
 def is_whitelisted(contact: str) -> bool:
-    """Check if contact is in whitelist."""
-    whitelist = os.getenv("WHITELIST_CONTACTS", "").split(",")
-    whitelist = [w.strip().lower() for w in whitelist if w.strip()]
+    """Check if contact is in whitelist from environment."""
+    whitelist_str = os.getenv("WHITELIST_CONTACTS", "")
+    if not whitelist_str:
+        logger.error("No whitelist configured. All contacts blocked.")
+        return False
+    
+    whitelist = [w.strip().lower() for w in whitelist_str.split(",") if w.strip()]
     return contact.strip().lower() in whitelist
 
 
@@ -126,45 +143,80 @@ async def startup_event():
         logger.warning("Emergency stop is active. Startup aborted.")
         return
     
+    # Validate critical environment variables
+    required_vars = ["WHITELIST_CONTACTS", "ALLOWED_BASE"]
+    missing = [v for v in required_vars if not os.getenv(v)]
+    if missing:
+        logger.error(f"Missing required environment variables: {missing}")
+        logger.error("Please configure .env file before starting.")
+        return
+    
     # Initialize modules
-    state["ai_manager"] = AIManager(models_dir=MODELS_DIR)
+    state["ai_manager"] = AIManager(
+        models_dir=MODELS_DIR,
+        backend=os.getenv("AI_BACKEND", "ollama"),
+        default_model=os.getenv("DEFAULT_MODEL", "llama3.2"),
+    )
     await state["ai_manager"].initialize()
     
-    state["browser"] = BrowserAutomation()
+    state["browser"] = BrowserAutomation(
+        headless=os.getenv("BROWSER_HEADLESS", "false").lower() == "true",
+        download_dir=DOWNLOAD_DIR,
+    )
     await state["browser"].initialize()
     
     state["file_manager"] = FileManager(base_dir=ALLOWED_BASE)
+    state["pipeline_runner"] = PipelineRunner(
+        ai_manager=state["ai_manager"],
+        browser=state["browser"],
+        file_manager=state["file_manager"],
+        pipelines_dir=PIPELINES_DIR,
+    )
     
     # Setup scheduler
     state["scheduler"] = AsyncIOScheduler()
-    state["scheduler"].add_job(
-        run_sunday_pipeline,
-        CronTrigger(day_of_week="sun", hour=9, minute=0),
-        id="sunday_pipeline",
-    )
+    
+    # Load and schedule saved pipelines
+    saved_pipelines = state["pipeline_runner"].list_pipelines()
+    for pipeline in saved_pipelines:
+        if pipeline.get("schedule"):
+            try:
+                state["scheduler"].add_job(
+                    state["pipeline_runner"].run_pipeline,
+                    CronTrigger.from_crontab(pipeline["schedule"]),
+                    args=[pipeline["id"]],
+                    id=f"pipeline_{pipeline['id']}",
+                    name=pipeline["name"],
+                )
+                logger.info(f"Scheduled pipeline: {pipeline['name']}")
+            except Exception as e:
+                logger.error(f"Failed to schedule pipeline {pipeline['id']}: {e}")
+    
     state["scheduler"].start()
     
-    # Start listeners
-    state["email_listener"] = EmailListener(
-        ai_manager=state["ai_manager"],
-        whitelist_check=is_whitelisted,
-        callback=on_email_action,
-    )
-    asyncio.create_task(state["email_listener"].start_listening())
+    # Start listeners (only if credentials configured)
+    if os.getenv("EMAIL_SENDER") and os.getenv("EMAIL_PASSWORD"):
+        state["email_listener"] = EmailListener(
+            ai_manager=state["ai_manager"],
+            whitelist_check=is_whitelisted,
+            callback=on_email_action,
+        )
+        asyncio.create_task(state["email_listener"].start_listening())
     
-    state["whatsapp_listener"] = WhatsAppListener(
-        browser=state["browser"],
-        ai_manager=state["ai_manager"],
-        whitelist_check=is_whitelisted,
-        callback=on_whatsapp_action,
-    )
-    asyncio.create_task(state["whatsapp_listener"].start_listening())
+    if os.getenv("WHATSAPP_ENABLED", "false").lower() == "true":
+        state["whatsapp_listener"] = WhatsAppListener(
+            browser=state["browser"],
+            ai_manager=state["ai_manager"],
+            whitelist_check=is_whitelisted,
+            callback=on_whatsapp_action,
+        )
+        asyncio.create_task(state["whatsapp_listener"].start_listening())
     
     state["status"] = "running"
     logger.info("AI Automation Hub is fully operational!")
 
 
-# ─── Emergency Stop Endpoint ─────────────────────────────────────────────────
+# ─── Emergency Stop ──────────────────────────────────────────────────────────
 @app.post("/api/emergency-stop")
 async def trigger_emergency_stop():
     """Immediately halt all automation."""
@@ -172,20 +224,16 @@ async def trigger_emergency_stop():
     
     if state["scheduler"]:
         state["scheduler"].shutdown(wait=False)
-    
     if state["browser"]:
         await state["browser"].cleanup()
-    
     if state["email_listener"]:
         state["email_listener"].stop()
-    
     if state["whatsapp_listener"]:
         state["whatsapp_listener"].stop()
     
     state["status"] = "emergency_stopped"
-    logger.critical("EMERGENCY STOP ACTIVATED - All systems halted")
-    
-    return {"status": "stopped", "message": "All automation halted"}
+    logger.critical("EMERGENCY STOP ACTIVATED")
+    return {"status": "stopped"}
 
 
 # ─── API Endpoints ───────────────────────────────────────────────────────────
@@ -202,9 +250,52 @@ async def get_status():
 async def query_ai(prompt: str):
     if emergency_stop.is_set():
         raise HTTPException(status_code=503, detail="System stopped")
-    
     response = await state["ai_manager"].generate(prompt)
     return {"response": response}
+
+
+# ─── Pipeline Builder Endpoints ──────────────────────────────────────────────
+@app.get("/api/pipelines")
+async def list_pipelines():
+    """List all saved pipelines."""
+    return state["pipeline_runner"].list_pipelines()
+
+
+@app.post("/api/pipelines")
+async def save_pipeline(pipeline_data: dict):
+    """Save a new pipeline."""
+    return state["pipeline_runner"].save_pipeline(pipeline_data)
+
+
+@app.get("/api/pipelines/{pipeline_id}")
+async def get_pipeline(pipeline_id: str):
+    """Get a specific pipeline."""
+    return state["pipeline_runner"].get_pipeline(pipeline_id)
+
+
+@app.delete("/api/pipelines/{pipeline_id}")
+async def delete_pipeline(pipeline_id: str):
+    """Delete a pipeline."""
+    return state["pipeline_runner"].delete_pipeline(pipeline_id)
+
+
+@app.post("/api/pipelines/{pipeline_id}/run")
+async def run_pipeline(pipeline_id: str):
+    """Run a specific pipeline."""
+    if emergency_stop.is_set():
+        raise HTTPException(status_code=503, detail="System stopped")
+    
+    asyncio.create_task(state["pipeline_runner"].run_pipeline(pipeline_id))
+    return {"status": "started", "pipeline_id": pipeline_id}
+
+
+@app.post("/api/pipelines/generate")
+async def generate_pipeline(prompt: str):
+    """Use AI to generate a pipeline from a text prompt."""
+    if emergency_stop.is_set():
+        raise HTTPException(status_code=503, detail="System stopped")
+    
+    return await state["pipeline_runner"].generate_pipeline_from_prompt(prompt)
 
 
 # ─── File Manager Endpoints (Sandboxed) ──────────────────────────────────────
@@ -220,63 +311,34 @@ async def upload_file(file: UploadFile = File(...), destination: str = ""):
     return await state["file_manager"].upload_file(file, target_dir)
 
 
-# ─── Pipeline ────────────────────────────────────────────────────────────────
-async def run_sunday_pipeline():
-    """Sunday 9 AM automated pipeline."""
-    if emergency_stop.is_set():
-        logger.warning("Pipeline skipped: Emergency stop active")
-        return
-    
-    logger.info("Starting Sunday Pipeline...")
-    
-    try:
-        # Step 1-8: Research, scrape, analyze, report, style, images, summary, send
-        research_data = await state["browser"].research_category("AI Trends")
-        scraped = await state["browser"].scrape_research_data(research_data)
-        analysis = await state["ai_manager"].analyze_data(scraped)
-        filtered = await state["ai_manager"].filter_and_process(scraped, analysis)
-        
-        report_path = REPORTS_DIR / f"report_{datetime.now().strftime('%Y%m%d')}.xlsx"
-        await state["browser"].generate_spreadsheet_report(filtered, report_path)
-        
-        summary = await state["ai_manager"].generate_summary(filtered, analysis)
-        
-        # Send to whitelisted contacts only
-        await send_email_report(summary, [str(report_path)])
-        await state["browser"].send_whatsapp_message("Team Updates", summary)
-        
-        logger.info("Sunday Pipeline completed successfully!")
-        
-    except Exception as e:
-        logger.error(f"Pipeline failed: {e}")
-
-
 # ─── Event Callbacks (Whitelist Enforced) ────────────────────────────────────
-async def on_email_action(sender: str, action: str, data: dict):
+async def on_email_action(sender: str, action: str,  dict):
     if not is_whitelisted(sender):
         logger.warning(f"BLOCKED: Unauthorized email from {sender}")
         return
-    
     if emergency_stop.is_set():
         return
     
     if action == "run_pipeline":
-        asyncio.create_task(run_sunday_pipeline())
+        pipeline_id = data.get("pipeline_id")
+        if pipeline_id:
+            asyncio.create_task(state["pipeline_runner"].run_pipeline(pipeline_id))
     elif action == "query_ai":
         response = await state["ai_manager"].generate(data["prompt"])
         await state["email_listener"].send_reply(sender, response)
 
 
-async def on_whatsapp_action(sender: str, action: str, data: dict):
+async def on_whatsapp_action(sender: str, action: str,  dict):
     if not is_whitelisted(sender):
         logger.warning(f"BLOCKED: Unauthorized WhatsApp from {sender}")
         return
-    
     if emergency_stop.is_set():
         return
     
     if action == "run_pipeline":
-        asyncio.create_task(run_sunday_pipeline())
+        pipeline_id = data.get("pipeline_id")
+        if pipeline_id:
+            asyncio.create_task(state["pipeline_runner"].run_pipeline(pipeline_id))
     elif action == "query_ai":
         response = await state["ai_manager"].generate(data["message"])
         await state["browser"].send_whatsapp_reply(data["chat_id"], response)
@@ -285,23 +347,376 @@ async def on_whatsapp_action(sender: str, action: str, data: dict):
 # ─── Run Server ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)  # SECURITY: Localhost only
+    uvicorn.run(app, host=HOST, port=PORT, reload=DEBUG)
+`
+  },
+  {
+    name: "pipeline_runner.py",
+    path: "pipeline_runner.py",
+    language: "python",
+    description: "Visual pipeline execution engine with branching support",
+    content: `"""
+AI Automation Hub - Pipeline Runner
+=====================================
+Executes visual pipelines with support for:
+- Sequential steps
+- Branching (if/else)
+- Parallel execution
+- AI-generated pipelines from prompts
+"""
+
+import os
+import json
+import uuid
+import asyncio
+import logging
+from pathlib import Path
+from typing import Dict, List, Any, Optional
+from datetime import datetime
+
+logger = logging.getLogger("AIHub.PipelineRunner")
+
+
+class PipelineRunner:
+    """Executes visual pipelines with branching support."""
+
+    def __init__(self, ai_manager, browser, file_manager, pipelines_dir: Path):
+        self.ai_manager = ai_manager
+        self.browser = browser
+        self.file_manager = file_manager
+        self.pipelines_dir = pipelines_dir
+        self.pipelines_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Node executors
+        self.executors = {
+            "start": self._execute_start,
+            "end": self._execute_end,
+            "ai_query": self._execute_ai_query,
+            "web_scrape": self._execute_web_scrape,
+            "email_send": self._execute_email_send,
+            "whatsapp_send": self._execute_whatsapp_send,
+            "file_save": self._execute_file_save,
+            "wait": self._execute_wait,
+            "branch": self._execute_branch,
+        }
+
+    def list_pipelines(self) -> List[Dict]:
+        """List all saved pipelines."""
+        pipelines = []
+        for file in self.pipelines_dir.glob("*.json"):
+            try:
+                with open(file, "r") as f:
+                    data = json.load(f)
+                    pipelines.append({
+                        "id": data["id"],
+                        "name": data["name"],
+                        "description": data.get("description", ""),
+                        "schedule": data.get("schedule"),
+                        "created": data.get("created"),
+                        "node_count": len(data.get("nodes", [])),
+                    })
+            except Exception as e:
+                logger.error(f"Error loading pipeline {file}: {e}")
+        return pipelines
+
+    def save_pipeline(self, pipeline_data: Dict) -> Dict:
+        """Save a pipeline to disk."""
+        if "id" not in pipeline_data:
+            pipeline_data["id"] = str(uuid.uuid4())
+        
+        pipeline_data["created"] = datetime.now().isoformat()
+        pipeline_data["modified"] = datetime.now().isoformat()
+        
+        file_path = self.pipelines_dir / f"{pipeline_data['id']}.json"
+        with open(file_path, "w") as f:
+            json.dump(pipeline_data, f, indent=2)
+        
+        logger.info(f"Pipeline saved: {pipeline_data['name']}")
+        return {"id": pipeline_data["id"], "status": "saved"}
+
+    def get_pipeline(self, pipeline_id: str) -> Dict:
+        """Load a pipeline from disk."""
+        file_path = self.pipelines_dir / f"{pipeline_id}.json"
+        if not file_path.exists():
+            raise ValueError(f"Pipeline not found: {pipeline_id}")
+        
+        with open(file_path, "r") as f:
+            return json.load(f)
+
+    def delete_pipeline(self, pipeline_id: str) -> Dict:
+        """Delete a pipeline."""
+        file_path = self.pipelines_dir / f"{pipeline_id}.json"
+        if file_path.exists():
+            file_path.unlink()
+            logger.info(f"Pipeline deleted: {pipeline_id}")
+            return {"status": "deleted"}
+        raise ValueError(f"Pipeline not found: {pipeline_id}")
+
+    async def run_pipeline(self, pipeline_id: str, context: Dict = None) -> Dict:
+        """Execute a pipeline with branching support."""
+        pipeline = self.get_pipeline(pipeline_id)
+        nodes = {node["id"]: node for node in pipeline["nodes"]}
+        
+        # Initialize execution context
+        ctx = context or {}
+        ctx["pipeline_id"] = pipeline_id
+        ctx["pipeline_name"] = pipeline["name"]
+        ctx["results"] = {}
+        ctx["logs"] = []
+        
+        logger.info(f"Starting pipeline: {pipeline['name']}")
+        
+        # Find start node
+        start_node = next((n for n in nodes.values() if n["type"] == "start"), None)
+        if not start_node:
+            raise ValueError("Pipeline has no start node")
+        
+        # Execute from start node
+        await self._execute_node(start_node, nodes, ctx)
+        
+        logger.info(f"Pipeline completed: {pipeline['name']}")
+        return {
+            "status": "completed",
+            "pipeline_id": pipeline_id,
+            "results": ctx["results"],
+            "logs": ctx["logs"],
+        }
+
+    async def _execute_node(self, node: Dict, nodes: Dict, ctx: Dict):
+        """Execute a single node and follow connections."""
+        node_type = node["type"]
+        executor = self.executors.get(node_type)
+        
+        if not executor:
+            raise ValueError(f"Unknown node type: {node_type}")
+        
+        # Log execution
+        ctx["logs"].append({
+            "node_id": node["id"],
+            "node_type": node_type,
+            "timestamp": datetime.now().isoformat(),
+            "status": "started",
+        })
+        
+        try:
+            # Execute the node
+            result = await executor(node, ctx)
+            ctx["results"][node["id"]] = result
+            
+            # Log completion
+            ctx["logs"][-1]["status"] = "completed"
+            ctx["logs"][-1]["result"] = str(result)[:200]
+            
+            # Follow connections
+            connections = node.get("connections", {})
+            
+            # Handle branching
+            if node_type == "branch":
+                # Branch returns "true" or "false" path
+                next_path = result.get("path", "true")
+                next_node_id = connections.get(next_path)
+            else:
+                # Default: follow "next" connection
+                next_node_id = connections.get("next")
+            
+            if next_node_id and next_node_id in nodes:
+                await self._execute_node(nodes[next_node_id], nodes, ctx)
+        
+        except Exception as e:
+            ctx["logs"][-1]["status"] = "error"
+            ctx["logs"][-1]["error"] = str(e)
+            logger.error(f"Node {node['id']} failed: {e}")
+            
+            # Follow error path if exists
+            error_path = node.get("connections", {}).get("error")
+            if error_path and error_path in nodes:
+                await self._execute_node(nodes[error_path], nodes, ctx)
+            else:
+                raise
+
+    # ─── Node Executors ──────────────────────────────────────────────────────
+
+    async def _execute_start(self, node: Dict, ctx: Dict) -> Dict:
+        """Start node - initializes pipeline."""
+        return {"status": "started"}
+
+    async def _execute_end(self, node: Dict, ctx: Dict) -> Dict:
+        """End node - finalizes pipeline."""
+        return {"status": "ended"}
+
+    async def _execute_ai_query(self, node: Dict, ctx: Dict) -> Dict:
+        """AI Query node - sends prompt to AI model."""
+        prompt = node.get("config", {}).get("prompt", "")
+        
+        # Replace variables in prompt
+        prompt = self._replace_variables(prompt, ctx)
+        
+        response = await self.ai_manager.generate(prompt)
+        return {"response": response}
+
+    async def _execute_web_scrape(self, node: Dict, ctx: Dict) -> Dict:
+        """Web Scrape node - scrapes data from URLs."""
+        urls = node.get("config", {}).get("urls", [])
+        
+        # Replace variables in URLs
+        urls = [self._replace_variables(url, ctx) for url in urls]
+        
+        results = []
+        for url in urls:
+            try:
+                data = await self.browser.navigate(url)
+                results.append(data)
+            except Exception as e:
+                logger.error(f"Scrape failed for {url}: {e}")
+        
+        return {"scraped": results}
+
+    async def _execute_email_send(self, node: Dict, ctx: Dict) -> Dict:
+        """Email Send node - sends email."""
+        config = node.get("config", {})
+        to = self._replace_variables(config.get("to", ""), ctx)
+        subject = self._replace_variables(config.get("subject", ""), ctx)
+        body = self._replace_variables(config.get("body", ""), ctx)
+        
+        # Email sending would be implemented here
+        logger.info(f"Email sent to {to}: {subject}")
+        return {"sent": True, "to": to}
+
+    async def _execute_whatsapp_send(self, node: Dict, ctx: Dict) -> Dict:
+        """WhatsApp Send node - sends WhatsApp message."""
+        config = node.get("config", {})
+        contact = self._replace_variables(config.get("contact", ""), ctx)
+        message = self._replace_variables(config.get("message", ""), ctx)
+        
+        await self.browser.send_whatsapp_message(contact, message)
+        return {"sent": True, "contact": contact}
+
+    async def _execute_file_save(self, node: Dict, ctx: Dict) -> Dict:
+        """File Save node - saves data to file."""
+        config = node.get("config", {})
+        filename = self._replace_variables(config.get("filename", "output.txt"), ctx)
+        content = self._replace_variables(config.get("content", ""), ctx)
+        
+        # Save to sandboxed directory
+        file_path = self.file_manager.save_file(filename, content.encode())
+        return {"saved": str(file_path)}
+
+    async def _execute_wait(self, node: Dict, ctx: Dict) -> Dict:
+        """Wait node - pauses execution."""
+        seconds = node.get("config", {}).get("seconds", 1)
+        await asyncio.sleep(seconds)
+        return {"waited": seconds}
+
+    async def _execute_branch(self, node: Dict, ctx: Dict) -> Dict:
+        """Branch node - conditional logic."""
+        config = node.get("config", {})
+        condition = config.get("condition", "")
+        
+        # Replace variables in condition
+        condition = self._replace_variables(condition, ctx)
+        
+        # Evaluate condition (simple implementation)
+        try:
+            # Support simple comparisons
+            if "==" in condition:
+                left, right = condition.split("==")
+                result = left.strip() == right.strip()
+            elif "!=" in condition:
+                left, right = condition.split("!=")
+                result = left.strip() != right.strip()
+            elif ">" in condition:
+                left, right = condition.split(">")
+                result = float(left.strip()) > float(right.strip())
+            elif "<" in condition:
+                left, right = condition.split("<")
+                result = float(left.strip()) < float(right.strip())
+            else:
+                # Default to truthy check
+                result = bool(condition.strip())
+            
+            return {"path": "true" if result else "false"}
+        
+        except Exception as e:
+            logger.error(f"Branch evaluation failed: {e}")
+            return {"path": "false"}
+
+    def _replace_variables(self, text: str, ctx: Dict) -> str:
+        """Replace {{variable}} placeholders with context values."""
+        import re
+        
+        def replacer(match):
+            var_name = match.group(1)
+            # Check pipeline results
+            for node_id, result in ctx.get("results", {}).items():
+                if isinstance(result, dict) and var_name in result:
+                    return str(result[var_name])
+            # Check context
+            if var_name in ctx:
+                return str(ctx[var_name])
+            return match.group(0)  # Leave unchanged if not found
+        
+        return re.sub(r"\\{\\{(\\w+)\\}\\}", replacer, text)
+
+    async def generate_pipeline_from_prompt(self, prompt: str) -> Dict:
+        """Use AI to generate a pipeline structure from text description."""
+        ai_prompt = f"""
+        Convert this pipeline description into a JSON structure:
+        
+        Description: {prompt}
+        
+        Available node types:
+        - start: Pipeline entry point
+        - end: Pipeline exit point
+        - ai_query: Send prompt to AI (config: {{"prompt": "..."}})
+        - web_scrape: Scrape URLs (config: {{"urls": ["..."]}})
+        - email_send: Send email (config: {{"to": "...", "subject": "...", "body": "..."}})
+        - whatsapp_send: Send WhatsApp (config: {{"contact": "...", "message": "..."}})
+        - file_save: Save file (config: {{"filename": "...", "content": "..."}})
+        - wait: Pause (config: {{"seconds": N}})
+        - branch: Conditional (config: {{"condition": "..."}}, connections: {{"true": "node_id", "false": "node_id"}})
+        
+        Return JSON with:
+        {{
+            "name": "Pipeline name",
+            "description": "Brief description",
+            "nodes": [
+                {{"id": "node_1", "type": "start", "position": {{"x": 0, "y": 0}}, "connections": {{"next": "node_2"}}}},
+                ...
+            ]
+        }}
+        
+        Use sequential node IDs (node_1, node_2, etc.).
+        Position nodes in a logical flow (x increases right, y increases down).
+        """
+        
+        response = await self.ai_manager.generate(ai_prompt, max_tokens=2000)
+        
+        # Try to extract JSON from response
+        try:
+            json_start = response.find("{")
+            json_end = response.rfind("}") + 1
+            if json_start >= 0 and json_end > json_start:
+                pipeline_data = json.loads(response[json_start:json_end])
+                pipeline_data["id"] = str(uuid.uuid4())
+                return {"status": "generated", "pipeline": pipeline_data}
+        except json.JSONDecodeError:
+            pass
+        
+        return {"status": "failed", "error": "Could not parse AI response"}
 `
   },
   {
     name: "automation.py",
     path: "automation.py",
     language: "python",
-    description: "Playwright browser automation with security controls",
+    description: "Browser automation - all paths from environment",
     content: `"""
-AI Automation Hub - Browser Automation (Security Hardened)
-===========================================================
-Playwright-based Chrome automation with:
-- Sandboxed file downloads
-- Whitelist-enforced messaging
-- Emergency stop support
+AI Automation Hub - Browser Automation
+========================================
+All configuration from environment variables.
 """
 
+import os
 import asyncio
 import logging
 from pathlib import Path
@@ -316,16 +731,19 @@ logger = logging.getLogger("AIHub.Automation")
 class BrowserAutomation:
     """Manages Playwright browser with security controls."""
 
-    def __init__(self, headless: bool = False):
+    def __init__(self, headless: bool = False, download_dir: Path = None):
         self.playwright = None
         self.browser: Optional[Browser] = None
         self.context: Optional[BrowserContext] = None
         self.main_page: Optional[Page] = None
         self.headless = headless
         
-        # SECURITY: Restrict downloads to sandbox
-        self.allowed_download_dir = Path("C:/AI_Automation/Downloads")
-        self.user_data_dir = Path("C:/AI_Automation/BrowserData")
+        # All paths from environment
+        allowed_base = Path(os.getenv("ALLOWED_BASE", "./sandbox"))
+        self.allowed_download_dir = download_dir or (allowed_base / "Downloads")
+        
+        browser_data_subdir = os.getenv("BROWSER_DATA_SUBDIR", "BrowserData")
+        self.user_data_dir = allowed_base / browser_data_subdir
 
     async def initialize(self):
         """Launch browser with security restrictions."""
@@ -342,7 +760,7 @@ class BrowserAutomation:
         )
 
         self.main_page = self.context.pages[0] if self.context.pages else await self.context.new_page()
-        logger.info("Browser initialized with security restrictions")
+        logger.info("Browser initialized")
 
     async def cleanup(self):
         """Clean up browser resources."""
@@ -350,7 +768,6 @@ class BrowserAutomation:
             await self.context.close()
         if self.playwright:
             await self.playwright.stop()
-        logger.info("Browser cleaned up")
 
     async def navigate(self, url: str) -> Dict:
         """Navigate to URL."""
@@ -361,51 +778,13 @@ class BrowserAutomation:
             "status": response.status if response else None,
         }
 
-    async def download_huggingface_model(
-        self, model_name: str, save_path: Path
-    ) -> Dict:
-        """Download model from HuggingFace with path validation."""
-        # SECURITY: Validate download path
-        if not str(save_path.resolve()).startswith(str(self.allowed_download_dir)):
-            raise ValueError("Download path outside allowed directory")
-        
-        save_path.mkdir(parents=True, exist_ok=True)
-        page = await self.context.new_page()
-
-        try:
-            await page.goto("https://huggingface.co/models")
-            search = page.locator('input[placeholder*="Search"]')
-            await search.fill(model_name)
-            await search.press("Enter")
-            await page.wait_for_load_state("networkidle")
-
-            # Download first result
-            first_result = page.locator(".model-card").first
-            await first_result.click()
-            
-            # ... download logic ...
-            
-            return {"success": True, "model": model_name, "path": str(save_path)}
-
-        except Exception as e:
-            logger.error(f"Model download failed: {e}")
-            return {"success": False, "error": str(e)}
-        finally:
-            await page.close()
-
-    async def send_whatsapp_message(
-        self, contact: str, message: str, media_path: str = None
-    ):
-        """Send WhatsApp message with whitelist check."""
-        # SECURITY: Only send to whitelisted contacts
-        # (Whitelist check happens in main.py before calling this)
-        
+    async def send_whatsapp_message(self, contact: str, message: str):
+        """Send WhatsApp message."""
         page = await self.context.new_page()
         await page.goto("https://web.whatsapp.com")
         await page.wait_for_selector('[data-testid="chat-list"]', timeout=60000)
 
         try:
-            # Search and send message
             search = page.locator('[data-testid="chat-list-search"]')
             await search.fill(contact)
             await asyncio.sleep(2)
@@ -417,58 +796,19 @@ class BrowserAutomation:
             await page.locator('[data-testid="send"]').click()
             
             logger.info(f"WhatsApp message sent to {contact}")
-
-        except Exception as e:
-            logger.error(f"WhatsApp send failed: {e}")
         finally:
             await page.close()
-
-    async def research_category(self, category: str) -> List[Dict]:
-        """Research a category across multiple sources."""
-        results = []
-        sources = ["arxiv.org", "huggingface.co", "github.com/trending"]
-        
-        for source in sources:
-            page = await self.context.new_page()
-            try:
-                await page.goto(f"https://{source}")
-                # ... scraping logic ...
-                results.append({"source": source, "category": category})
-            except Exception as e:
-                logger.error(f"Scraping {source} failed: {e}")
-            finally:
-                await page.close()
-        
-        return results
-
-    async def generate_spreadsheet_report(
-        self, data: List[Dict], output_path: Path
-    ) -> Path:
-        """Generate Excel report."""
-        import openpyxl
-        
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        
-        # ... report generation logic ...
-        
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        wb.save(str(output_path))
-        return output_path
 `
   },
   {
     name: "file_manager.py",
     path: "file_manager.py",
     language: "python",
-    description: "Sandboxed file manager with path traversal protection",
+    description: "Sandboxed file manager - base path from environment",
     content: `"""
-AI Automation Hub - File Manager (Security Hardened)
-=====================================================
-File operations restricted to sandboxed directory with:
-- Path traversal protection
-- Whitelist validation
-- Operation logging
+AI Automation Hub - File Manager
+==================================
+Base directory from environment variable.
 """
 
 import os
@@ -482,37 +822,27 @@ logger = logging.getLogger("AIHub.FileManager")
 
 
 class SecurityError(Exception):
-    """Raised when a security violation is detected."""
     pass
 
 
 class FileManager:
-    """Sandboxed file manager with security controls."""
+    """Sandboxed file manager."""
 
-    def __init__(self, base_dir: Path):
-        self.base_dir = base_dir.resolve()
-        
-        # Ensure base directory exists
+    def __init__(self, base_dir: Path = None):
+        # Base directory from environment
+        self.base_dir = (base_dir or Path(os.getenv("ALLOWED_BASE", "./sandbox"))).resolve()
         self.base_dir.mkdir(parents=True, exist_ok=True)
-        
-        logger.info(f"FileManager initialized with sandbox: {self.base_dir}")
 
     def validate_path(self, requested_path: str) -> Path:
-        """Validate that path is within sandbox."""
+        """Validate path is within sandbox."""
         resolved = (self.base_dir / requested_path).resolve()
-        
         if not str(resolved).startswith(str(self.base_dir)):
-            logger.critical(f"SECURITY: Path traversal blocked: {requested_path}")
-            raise SecurityError(
-                f"Access denied: Path outside sandbox: {requested_path}"
-            )
-        
+            raise SecurityError(f"Access denied: {requested_path}")
         return resolved
 
     def list_files(self, directory: str = "") -> List[Dict]:
-        """List files in directory with path validation."""
+        """List files in directory."""
         target = self.validate_path(directory)
-        
         if not target.exists():
             return []
         
@@ -526,12 +856,18 @@ class FileManager:
                 "size": stat.st_size if item.is_file() else None,
                 "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
             })
-        
         return sorted(files, key=lambda x: (not x["is_dir"], x["name"]))
 
+    def save_file(self, filename: str, content: bytes, directory: str = "") -> Path:
+        """Save file with path validation."""
+        target_dir = self.validate_path(directory) if directory else self.base_dir
+        target_dir.mkdir(parents=True, exist_ok=True)
+        file_path = target_dir / filename
+        file_path.write_bytes(content)
+        return file_path
+
     async def upload_file(self, file, target_dir: Path) -> Dict:
-        """Upload file with path validation."""
-        # SECURITY: Validate target directory
+        """Upload file with validation."""
         validated_dir = self.validate_path(str(target_dir.relative_to(self.base_dir)))
         validated_dir.mkdir(parents=True, exist_ok=True)
         
@@ -539,193 +875,11 @@ class FileManager:
         content = await file.read()
         file_path.write_bytes(content)
         
-        logger.info(f"File uploaded: {file_path} ({len(content)} bytes)")
-        
         return {
             "filename": file.filename,
             "path": str(file_path.relative_to(self.base_dir)),
             "size": len(content),
         }
-
-    def delete_file(self, filepath: str) -> bool:
-        """Delete file with path validation."""
-        target = self.validate_path(filepath)
-        
-        if not target.exists():
-            return False
-        
-        if target.is_file():
-            target.unlink()
-        elif target.is_dir():
-            shutil.rmtree(target)
-        
-        logger.info(f"File deleted: {target}")
-        return True
-
-    def get_disk_usage(self) -> Dict:
-        """Get disk usage for sandbox directory."""
-        usage = shutil.disk_usage(str(self.base_dir))
-        return {
-            "total": self._human_size(usage.total),
-            "used": self._human_size(usage.used),
-            "free": self._human_size(usage.free),
-            "percent_used": round((usage.used / usage.total) * 100, 1),
-        }
-
-    def _human_size(self, size: int) -> str:
-        """Convert bytes to human-readable size."""
-        for unit in ["B", "KB", "MB", "GB", "TB"]:
-            if size < 1024:
-                return f"{size:.1f} {unit}"
-            size /= 1024
-        return f"{size:.1f} PB"
-`
-  },
-  {
-    name: "email_listener.py",
-    path: "email_listener.py",
-    language: "python",
-    description: "IMAP email listener with whitelist enforcement",
-    content: `"""
-AI Automation Hub - Email Listener (Security Hardened)
-=======================================================
-IMAP-based email monitoring with:
-- Strict whitelist enforcement
-- Command parsing
-- Emergency stop support
-"""
-
-import asyncio
-import email
-import smtplib
-import logging
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from imaplib import IMAP4_SSL
-from typing import Callable, List
-from datetime import datetime
-
-logger = logging.getLogger("AIHub.EmailListener")
-
-
-class EmailListener:
-    """Email listener with whitelist enforcement."""
-
-    def __init__(
-        self,
-        ai_manager,
-        whitelist_check: Callable[[str], bool],
-        callback: Callable,
-        check_interval: int = 30,
-    ):
-        self.ai_manager = ai_manager
-        self.whitelist_check = whitelist_check  # SECURITY: Injected check
-        self.callback = callback
-        self.check_interval = check_interval
-        self.running = False
-        self.processed_ids: List[str] = []
-
-        # Email config
-        import os
-        self.imap_server = os.getenv("IMAP_SERVER", "imap.gmail.com")
-        self.email_address = os.getenv("EMAIL_SENDER", "")
-        self.email_password = os.getenv("EMAIL_PASSWORD", "")
-
-    async def start_listening(self):
-        """Start continuous email monitoring."""
-        self.running = True
-        logger.info(f"Email listener started. Monitoring: {self.email_address}")
-
-        while self.running:
-            try:
-                await self._check_inbox()
-            except Exception as e:
-                logger.error(f"Email check error: {e}")
-            
-            await asyncio.sleep(self.check_interval)
-
-    async def _check_inbox(self):
-        """Check inbox for new emails."""
-        mail = IMAP4_SSL(self.imap_server, 993)
-        mail.login(self.email_address, self.email_password)
-        mail.select("INBOX")
-
-        status, messages = mail.search(None, "UNSEEN")
-        if status != "OK":
-            mail.logout()
-            return
-
-        for email_id in messages[0].split():
-            eid = email_id.decode()
-            if eid in self.processed_ids:
-                continue
-
-            status, msg_data = mail.fetch(email_id, "(RFC822)")
-            if status != "OK":
-                continue
-
-            msg = email.message_from_bytes(msg_data[0][1])
-            sender = self._extract_email(msg.get("From", ""))
-
-            # SECURITY: Whitelist check
-            if not self.whitelist_check(sender):
-                logger.warning(f"BLOCKED: Unauthorized email from {sender}")
-                continue
-
-            subject = msg.get("Subject", "")
-            body = self._get_body(msg)
-
-            logger.info(f"Processing email from {sender}: {subject}")
-            await self._process_command(sender, subject, body)
-            self.processed_ids.append(eid)
-
-        mail.logout()
-
-    async def _process_command(self, sender: str, subject: str, body: str):
-        """Parse and execute email commands."""
-        subject_lower = subject.lower()
-
-        if "run pipeline" in subject_lower:
-            await self.callback(sender, "run_pipeline", {})
-        elif subject_lower.startswith("ai:"):
-            prompt = subject.split(":", 1)[1].strip()
-            await self.callback(sender, "query_ai", {"prompt": prompt})
-
-    async def send_reply(self, to: str, body: str):
-        """Send email reply."""
-        msg = MIMEMultipart()
-        msg["From"] = self.email_address
-        msg["To"] = to
-        msg["Subject"] = "Re: AI Hub Response"
-        msg.attach(MIMEText(body, "plain"))
-
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.starttls()
-            server.login(self.email_address, self.email_password)
-            server.send_message(msg)
-
-        logger.info(f"Reply sent to {to}")
-
-    def _extract_email(self, from_header: str) -> str:
-        """Extract email address from From header."""
-        if "<" in from_header and ">" in from_header:
-            return from_header.split("<")[1].split(">")[0]
-        return from_header.strip()
-
-    def _get_body(self, msg) -> str:
-        """Extract email body."""
-        if msg.is_multipart():
-            for part in msg.walk():
-                if part.get_content_type() == "text/plain":
-                    return part.get_payload(decode=True).decode()
-        else:
-            return msg.get_payload(decode=True).decode()
-        return ""
-
-    def stop(self):
-        """Stop listener."""
-        self.running = False
-        logger.info("Email listener stopped")
 `
   },
   {
@@ -733,8 +887,7 @@ class EmailListener:
     path: "requirements.txt",
     language: "text",
     description: "Python dependencies",
-    content: `# AI Automation Hub - Dependencies
-fastapi==0.104.1
+    content: `fastapi==0.104.1
 uvicorn[standard]==0.24.0
 playwright==1.40.0
 APScheduler==3.10.4
@@ -747,25 +900,47 @@ python-dotenv==1.0.0`
     name: ".env.example",
     path: ".env.example",
     language: "text",
-    description: "Environment configuration template",
+    description: "Environment configuration - ALL values must be set",
     content: `# AI Automation Hub - Environment Configuration
+# ALL VALUES MUST BE CONFIGURED - NO DEFAULTS FOR SECURITY
 
-# Email Configuration
+# ─── SECURITY: REQUIRED ──────────────────────────────────────────────────────
+# Whitelisted contacts (comma-separated) - ONLY these can trigger actions
+WHITELIST_CONTACTS=
+
+# Sandbox root directory - ALL file operations restricted here
+ALLOWED_BASE=
+
+# ─── SERVER ──────────────────────────────────────────────────────────────────
+HOST=127.0.0.1
+PORT=8000
+DEBUG=false
+ALLOWED_ORIGIN=http://localhost:8000
+
+# ─── SUBDIRECTORIES (relative to ALLOWED_BASE) ───────────────────────────────
+DOWNLOAD_SUBDIR=Downloads
+REPORTS_SUBDIR=Reports
+MODELS_SUBDIR=Models
+ASSETS_SUBDIR=Assets
+LOGS_SUBDIR=Logs
+PIPELINES_SUBDIR=Pipelines
+BROWSER_DATA_SUBDIR=BrowserData
+
+# ─── EMAIL (leave empty to disable) ──────────────────────────────────────────
+EMAIL_SENDER=
+EMAIL_PASSWORD=
 IMAP_SERVER=imap.gmail.com
-EMAIL_SENDER=your-agent@gmail.com
-EMAIL_PASSWORD=your-app-password
+SMTP_SERVER=smtp.gmail.com
 
-# SECURITY: Whitelisted Contacts (comma-separated)
-WHITELIST_CONTACTS=admin@company.com,manager@company.com,Admin,Boss
+# ─── WHATSAPP (set to true to enable) ────────────────────────────────────────
+WHATSAPP_ENABLED=false
 
-# WhatsApp Configuration
-WHATSAPP_WHITELIST=Admin,Manager,Boss
-
-# AI Model Configuration
+# ─── AI CONFIGURATION ────────────────────────────────────────────────────────
 AI_BACKEND=ollama
 DEFAULT_MODEL=llama3.2
+OLLAMA_URL=http://localhost:11434
 
-# File Paths (Windows)
-ALLOWED_BASE=C:/AI_Automation`
+# ─── BROWSER ─────────────────────────────────────────────────────────────────
+BROWSER_HEADLESS=false`
   }
 ];

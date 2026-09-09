@@ -5,8 +5,9 @@ import CodeViewer from './components/CodeViewer';
 import SetupGuide from './components/SetupGuide';
 import FileManager from './components/FileManager';
 import TaskScheduler from './components/TaskScheduler';
+import PipelineBuilder from './components/PipelineBuilder';
 
-export type Page = 'dashboard' | 'architecture' | 'code' | 'setup' | 'files' | 'scheduler';
+export type Page = 'dashboard' | 'architecture' | 'code' | 'setup' | 'files' | 'scheduler' | 'pipeline-builder';
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
@@ -46,6 +47,7 @@ function App() {
         {currentPage === 'setup' && <SetupGuide />}
         {currentPage === 'files' && <FileManager />}
         {currentPage === 'scheduler' && <TaskScheduler />}
+        {currentPage === 'pipeline-builder' && <PipelineBuilder />}
       </div>
     </div>
   );
