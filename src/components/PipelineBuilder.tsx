@@ -1,8 +1,8 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Position { x: number; y: number; }
-type NodeConfig = Record<string, string | number>;
+type NodeConfig = Record<string, string | number | boolean>;
 
 interface PipelineNode {
   id: string;
@@ -52,22 +52,58 @@ const NODE_TYPES: NodeTypeDef[] = [
   },
   {
     type: 'ai_query',
-    label: 'ASK THE AI',
+    label: 'ASK LOCAL AI',
     color: '#9b59b6',
-    plainEnglish: 'Send a question or task to the AI. It will think and give you an answer.',
+    plainEnglish: 'Send a question to your local AI (Ollama). It runs on your computer, no internet needed.',
     config: { prompt: '' },
     configFields: [
       { key: 'prompt', label: 'What do you want the AI to do?', type: 'textarea', placeholder: 'Example: Summarize this data into 3 bullet points' },
     ],
   },
   {
-    type: 'web_scrape',
-    label: 'READ A WEBSITE',
-    color: '#3498db',
-    plainEnglish: 'Open a website and grab information from it. Like copy-pasting, but automatic.',
-    config: { url: '' },
+    type: 'ai_browser',
+    label: 'BROWSE ONLINE AI',
+    color: '#ec4899',
+    plainEnglish: 'Open ChatGPT, Claude, or other AI websites. Type questions, wait for answers, collect results. The AI acts like a human user.',
+    config: { 
+      ai_service: 'chatgpt',
+      prompt: '',
+      wait_seconds: 30,
+      conversation_mode: false
+    },
     configFields: [
-      { key: 'url', label: 'Website address', type: 'text', placeholder: 'Example: https://news.ycombinator.com' },
+      { key: 'ai_service', label: 'Which AI service?', type: 'select', placeholder: 'chatgpt' },
+      { key: 'prompt', label: 'What to ask?', type: 'textarea', placeholder: 'Example: Write a poem about technology' },
+      { key: 'wait_seconds', label: 'How long to wait for response (seconds)?', type: 'number', placeholder: '30' },
+      { key: 'conversation_mode', label: 'Continue existing conversation?', type: 'checkbox', placeholder: 'false' },
+    ],
+  },
+  {
+    type: 'web_scrape',
+    label: 'READ WEBSITES',
+    color: '#3498db',
+    plainEnglish: 'Open one or more websites and grab information. You can enter multiple URLs, one per line.',
+    config: { urls: '' },
+    configFields: [
+      { key: 'urls', label: 'Website addresses (one per line)', type: 'textarea', placeholder: 'Example:\nhttps://news.ycombinator.com\nhttps://techcrunch.com\nhttps://arstechnica.com' },
+    ],
+  },
+  {
+    type: 'social_analyze',
+    label: 'ANALYZE SOCIAL MEDIA',
+    color: '#06b6d4',
+    plainEnglish: 'Search Twitter, Instagram, LinkedIn, or Facebook for posts about a topic. Analyze sentiment and trends.',
+    config: { 
+      platform: 'twitter',
+      query: '',
+      post_count: 10,
+      analyze_sentiment: true
+    },
+    configFields: [
+      { key: 'platform', label: 'Which platform?', type: 'select', placeholder: 'twitter' },
+      { key: 'query', label: 'What to search for?', type: 'text', placeholder: 'Example: artificial intelligence trends 2026' },
+      { key: 'post_count', label: 'How many posts to analyze?', type: 'number', placeholder: '10' },
+      { key: 'analyze_sentiment', label: 'Analyze sentiment (positive/negative)?', type: 'checkbox', placeholder: 'true' },
     ],
   },
   {
@@ -135,68 +171,71 @@ const TEMPLATES: Array<{
   nodes: PipelineNode[];
 }> = [
   {
-    id: 'weekly-report',
-    name: 'Weekly Research Report',
-    description: 'Scrape websites, let AI analyze the data, then email the summary to your team.',
-    useCase: 'Use this every Sunday to automatically compile a research report.',
+    id: 'multi-source-research',
+    name: 'Multi-Source Research Report',
+    description: 'Scrape multiple websites, let AI analyze all the data, then email the summary.',
+    useCase: 'Use this to gather information from multiple sources and create a comprehensive report.',
     nodes: [
       { id: 'n1', type: 'start', position: { x: 100, y: 100 }, config: {}, connections: { next: 'n2' } },
-      { id: 'n2', type: 'web_scrape', position: { x: 100, y: 250 }, config: { url: 'https://news.ycombinator.com' }, connections: { next: 'n3' } },
-      { id: 'n3', type: 'ai_query', position: { x: 100, y: 400 }, config: { prompt: 'Summarize the top stories into 5 bullet points' }, connections: { next: 'n4' } },
-      { id: 'n4', type: 'email_send', position: { x: 100, y: 550 }, config: { to: 'team@company.com', subject: 'Weekly Report', body: 'Here are this week\'s highlights:\n\n{{ai_answer}}' }, connections: { next: 'n5' } },
+      { id: 'n2', type: 'web_scrape', position: { x: 100, y: 250 }, config: { urls: 'https://news.ycombinator.com\nhttps://techcrunch.com\nhttps://arstechnica.com' }, connections: { next: 'n3' } },
+      { id: 'n3', type: 'ai_query', position: { x: 100, y: 400 }, config: { prompt: 'Analyze all these sources and create a comprehensive summary of the top trends' }, connections: { next: 'n4' } },
+      { id: 'n4', type: 'email_send', position: { x: 100, y: 550 }, config: { to: 'team@company.com', subject: 'Multi-Source Research Report', body: 'Here are the key findings:\n\n{{ai_answer}}' }, connections: { next: 'n5' } },
       { id: 'n5', type: 'end', position: { x: 100, y: 700 }, config: {}, connections: {} },
     ],
   },
   {
-    id: 'monitor-alert',
-    name: 'Website Monitor with Alert',
-    description: 'Check a website, let AI decide if something important changed, then alert you via WhatsApp.',
-    useCase: 'Use this to keep an eye on a competitor or important news source.',
+    id: 'ai-browser-comparison',
+    name: 'Compare AI Services',
+    description: 'Ask the same question to ChatGPT, Claude, and Gemini, then compare their answers.',
+    useCase: 'Use this to see how different AI services respond to the same question.',
     nodes: [
       { id: 'n1', type: 'start', position: { x: 100, y: 100 }, config: {}, connections: { next: 'n2' } },
-      { id: 'n2', type: 'web_scrape', position: { x: 100, y: 250 }, config: { url: 'https://example.com/status' }, connections: { next: 'n3' } },
-      { id: 'n3', type: 'ai_query', position: { x: 100, y: 400 }, config: { prompt: 'Is there anything urgent or important on this page? Answer YES or NO.' }, connections: { next: 'n4' } },
+      { id: 'n2', type: 'ai_browser', position: { x: -100, y: 250 }, config: { ai_service: 'chatgpt', prompt: 'Explain quantum computing in simple terms', wait_seconds: 30, conversation_mode: false }, connections: { next: 'n5' } },
+      { id: 'n3', type: 'ai_browser', position: { x: 100, y: 250 }, config: { ai_service: 'claude', prompt: 'Explain quantum computing in simple terms', wait_seconds: 30, conversation_mode: false }, connections: { next: 'n5' } },
+      { id: 'n4', type: 'ai_browser', position: { x: 300, y: 250 }, config: { ai_service: 'gemini', prompt: 'Explain quantum computing in simple terms', wait_seconds: 30, conversation_mode: false }, connections: { next: 'n5' } },
+      { id: 'n5', type: 'ai_query', position: { x: 100, y: 400 }, config: { prompt: 'Compare these three AI responses and explain which one is clearest and why' }, connections: { next: 'n6' } },
+      { id: 'n6', type: 'file_save', position: { x: 100, y: 550 }, config: { filename: 'ai_comparison.txt', content: '{{ai_answer}}' }, connections: { next: 'n7' } },
+      { id: 'n7', type: 'end', position: { x: 100, y: 700 }, config: {}, connections: {} },
+    ],
+  },
+  {
+    id: 'social-media-monitor',
+    name: 'Social Media Trend Monitor',
+    description: 'Search Twitter for mentions of a topic, analyze sentiment, and alert if negative.',
+    useCase: 'Use this to monitor brand reputation or track trending topics.',
+    nodes: [
+      { id: 'n1', type: 'start', position: { x: 100, y: 100 }, config: {}, connections: { next: 'n2' } },
+      { id: 'n2', type: 'social_analyze', position: { x: 100, y: 250 }, config: { platform: 'twitter', query: 'your brand name', post_count: 20, analyze_sentiment: true }, connections: { next: 'n3' } },
+      { id: 'n3', type: 'ai_query', position: { x: 100, y: 400 }, config: { prompt: 'Analyze these social media posts. Is the overall sentiment positive or negative? Answer YES if negative, NO if positive.' }, connections: { next: 'n4' } },
       { id: 'n4', type: 'branch', position: { x: 100, y: 550 }, config: { condition: '{{ai_answer}} == "YES"' }, connections: { true: 'n5', false: 'n6' } },
-      { id: 'n5', type: 'whatsapp_send', position: { x: -100, y: 700 }, config: { contact: 'Boss', message: 'URGENT: {{ai_answer}}' }, connections: { next: 'n7' } },
-      { id: 'n6', type: 'file_save', position: { x: 300, y: 700 }, config: { filename: 'monitor_log.txt', content: 'All clear at {{timestamp}}' }, connections: { next: 'n7' } },
+      { id: 'n5', type: 'whatsapp_send', position: { x: -100, y: 700 }, config: { contact: 'Boss', message: 'ALERT: Negative sentiment detected on social media! Check immediately.' }, connections: { next: 'n7' } },
+      { id: 'n6', type: 'file_save', position: { x: 300, y: 700 }, config: { filename: 'social_report.txt', content: 'All positive. {{ai_answer}}' }, connections: { next: 'n7' } },
       { id: 'n7', type: 'end', position: { x: 100, y: 850 }, config: {}, connections: {} },
     ],
   },
   {
-    id: 'daily-summary',
-    name: 'Daily AI Summary',
-    description: 'Ask the AI to write a summary of a topic, save it to a file, and email it.',
-    useCase: 'Use this every morning to get a briefing on a topic you care about.',
+    id: 'comprehensive-research',
+    name: 'Comprehensive Research Pipeline',
+    description: 'Scrape websites, analyze social media, use online AI for deep analysis, save report.',
+    useCase: 'Use this for in-depth research combining multiple data sources and AI services.',
     nodes: [
       { id: 'n1', type: 'start', position: { x: 100, y: 100 }, config: {}, connections: { next: 'n2' } },
-      { id: 'n2', type: 'ai_query', position: { x: 100, y: 250 }, config: { prompt: 'Write a 3-paragraph summary of the latest trends in artificial intelligence' }, connections: { next: 'n3' } },
-      { id: 'n3', type: 'file_save', position: { x: 100, y: 400 }, config: { filename: 'daily_summary.txt', content: '{{ai_answer}}' }, connections: { next: 'n4' } },
-      { id: 'n4', type: 'email_send', position: { x: 100, y: 550 }, config: { to: 'me@company.com', subject: 'Your Daily AI Briefing', body: '{{ai_answer}}' }, connections: { next: 'n5' } },
-      { id: 'n5', type: 'end', position: { x: 100, y: 700 }, config: {}, connections: {} },
-    ],
-  },
-  {
-    id: 'research-compare',
-    name: 'Research & Compare',
-    description: 'Read two websites, let AI compare them, then save the comparison.',
-    useCase: 'Use this to compare products, services, or news sources.',
-    nodes: [
-      { id: 'n1', type: 'start', position: { x: 100, y: 100 }, config: {}, connections: { next: 'n2' } },
-      { id: 'n2', type: 'web_scrape', position: { x: -100, y: 250 }, config: { url: 'https://site-a.com' }, connections: { next: 'n4' } },
-      { id: 'n3', type: 'web_scrape', position: { x: 300, y: 250 }, config: { url: 'https://site-b.com' }, connections: { next: 'n4' } },
-      { id: 'n4', type: 'ai_query', position: { x: 100, y: 400 }, config: { prompt: 'Compare these two sources. Which is better and why?' }, connections: { next: 'n5' } },
-      { id: 'n5', type: 'file_save', position: { x: 100, y: 550 }, config: { filename: 'comparison.txt', content: '{{ai_answer}}' }, connections: { next: 'n6' } },
-      { id: 'n6', type: 'end', position: { x: 100, y: 700 }, config: {}, connections: {} },
+      { id: 'n2', type: 'web_scrape', position: { x: 100, y: 250 }, config: { urls: 'https://industry-news.com\nhttps://research-papers.org' }, connections: { next: 'n3' } },
+      { id: 'n3', type: 'social_analyze', position: { x: 100, y: 400 }, config: { platform: 'twitter', query: 'industry trends 2026', post_count: 15, analyze_sentiment: true }, connections: { next: 'n4' } },
+      { id: 'n4', type: 'ai_browser', position: { x: 100, y: 550 }, config: { ai_service: 'chatgpt', prompt: 'Based on this web data and social media analysis, provide a comprehensive market research report with actionable insights', wait_seconds: 60, conversation_mode: false }, connections: { next: 'n5' } },
+      { id: 'n5', type: 'file_save', position: { x: 100, y: 700 }, config: { filename: 'comprehensive_research.txt', content: '{{ai_answer}}' }, connections: { next: 'n6' } },
+      { id: 'n6', type: 'email_send', position: { x: 100, y: 850 }, config: { to: 'stakeholders@company.com', subject: 'Comprehensive Market Research Report', body: '{{ai_answer}}' }, connections: { next: 'n7' } },
+      { id: 'n7', type: 'end', position: { x: 100, y: 1000 }, config: {}, connections: {} },
     ],
   },
 ];
 
 // ─── Example prompts for AI generation ───────────────────────────────────────
 const EXAMPLE_PROMPTS = [
-  'Every morning, ask the AI for tech news and email me the summary',
-  'Check a website every hour, if something changed, WhatsApp my boss',
-  'Read 3 news sites, combine them, save to a file',
-  'Ask AI to write a poem, save it, then email it to my friend',
+  'Scrape 3 tech news sites, analyze with ChatGPT, email the summary',
+  'Monitor Twitter for my brand, alert me if sentiment is negative',
+  'Compare responses from ChatGPT, Claude, and Gemini on the same question',
+  'Read multiple research papers, use online AI for deep analysis, save report',
 ];
 
 const NODE_WIDTH = 220;
@@ -266,7 +305,7 @@ export default function PipelineBuilder() {
     setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, position } : n));
   }, []);
 
-  const updateNodeConfig = useCallback((nodeId: string, key: string, value: string | number) => {
+  const updateNodeConfig = useCallback((nodeId: string, key: string, value: string | number | boolean) => {
     setNodes(prev => prev.map(n =>
       n.id === nodeId ? { ...n, config: { ...n.config, [key]: value } } : n
     ));
@@ -531,13 +570,35 @@ export default function PipelineBuilder() {
         id: `step_${++id}`,
         type: 'web_scrape',
         position: { x: 300, y },
-        config: { url: 'https://example.com' },
+        config: { urls: 'https://example.com' },
         connections: {},
       });
       generatedNodes[generatedNodes.length - 2].connections.next = generatedNodes[generatedNodes.length - 1].id;
     }
 
-    if (prompt.includes('ai') || prompt.includes('ask') || prompt.includes('analyze') || prompt.includes('think') || prompt.includes('summarize')) {
+    if (prompt.includes('social') || prompt.includes('twitter') || prompt.includes('instagram')) {
+      y += spacing;
+      generatedNodes.push({
+        id: `step_${++id}`,
+        type: 'social_analyze',
+        position: { x: 300, y },
+        config: { platform: 'twitter', query: 'trending topics', post_count: 10, analyze_sentiment: true },
+        connections: {},
+      });
+      generatedNodes[generatedNodes.length - 2].connections.next = generatedNodes[generatedNodes.length - 1].id;
+    }
+
+    if (prompt.includes('chatgpt') || prompt.includes('claude') || prompt.includes('gemini') || prompt.includes('online ai')) {
+      y += spacing;
+      generatedNodes.push({
+        id: `step_${++id}`,
+        type: 'ai_browser',
+        position: { x: 300, y },
+        config: { ai_service: 'chatgpt', prompt: 'Analyze the data', wait_seconds: 30, conversation_mode: false },
+        connections: {},
+      });
+      generatedNodes[generatedNodes.length - 2].connections.next = generatedNodes[generatedNodes.length - 1].id;
+    } else if (prompt.includes('ai') || prompt.includes('ask') || prompt.includes('analyze') || prompt.includes('think') || prompt.includes('summarize')) {
       y += spacing;
       generatedNodes.push({
         id: `step_${++id}`,
@@ -654,9 +715,15 @@ export default function PipelineBuilder() {
   if (viewMode === 'welcome') {
     return (
       <div>
-        <h1>BUILD A PIPELINE</h1>
+        <div style={{ marginBottom: '2rem' }}>
+          <h1 style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>DERZEN</h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '1.125rem', fontStyle: 'italic' }}>
+            Still and always be DERZEN
+          </p>
+        </div>
+
         <p style={{ color: 'var(--text-secondary)', marginBottom: '3rem', fontSize: '1.125rem' }}>
-          A pipeline is a series of steps that run automatically. You tell it what to do, and it does it for you.
+          Build powerful automation pipelines visually. No coding required.
         </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem', marginBottom: '3rem' }}>
@@ -726,7 +793,7 @@ export default function PipelineBuilder() {
               type="text"
               value={promptInput}
               onChange={(e) => setPromptInput(e.target.value)}
-              placeholder="Example: Every morning, summarize the news and email it to me"
+              placeholder="Example: Scrape 3 tech sites, analyze with ChatGPT, email summary"
               style={{
                 width: '100%',
                 padding: '0.875rem 1rem',
@@ -938,6 +1005,14 @@ export default function PipelineBuilder() {
 
   return (
     <div>
+      {/* Header */}
+      <div style={{ marginBottom: '1.5rem' }}>
+        <h1 style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>DERZEN</h1>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', fontStyle: 'italic' }}>
+          Still and always be DERZEN
+        </p>
+      </div>
+
       {/* Top Bar */}
       <div style={{
         display: 'flex',
@@ -1359,6 +1434,50 @@ export default function PipelineBuilder() {
                         fontSize: '0.875rem',
                       }}
                     />
+                  ) : field.type === 'checkbox' ? (
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(selectedNodeData.config[field.key])}
+                        onChange={(e) => updateNodeConfig(selectedNodeData.id, field.key, e.target.checked)}
+                        style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                      />
+                      <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                        {field.placeholder === 'true' ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </label>
+                  ) : field.type === 'select' ? (
+                    <select
+                      value={String(selectedNodeData.config[field.key] || '')}
+                      onChange={(e) => updateNodeConfig(selectedNodeData.id, field.key, e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        background: 'var(--bg-primary)',
+                        border: '1px solid var(--border)',
+                        color: 'var(--text-primary)',
+                        fontFamily: "'Poppins', sans-serif",
+                        fontWeight: 600,
+                        fontSize: '0.875rem',
+                      }}
+                    >
+                      {field.key === 'ai_service' && (
+                        <>
+                          <option value="chatgpt">ChatGPT</option>
+                          <option value="claude">Claude</option>
+                          <option value="gemini">Gemini</option>
+                          <option value="perplexity">Perplexity</option>
+                        </>
+                      )}
+                      {field.key === 'platform' && (
+                        <>
+                          <option value="twitter">Twitter / X</option>
+                          <option value="instagram">Instagram</option>
+                          <option value="linkedin">LinkedIn</option>
+                          <option value="facebook">Facebook</option>
+                        </>
+                      )}
+                    </select>
                   ) : (
                     <input
                       type="text"

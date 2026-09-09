@@ -86,8 +86,9 @@ emergency_stop = Event()
 
 # ─── FastAPI App ─────────────────────────────────────────────────────────────
 app = FastAPI(
-    title="AI Automation Hub",
-    version="2.0.0",
+    title="DERZEN - AI Automation Hub",
+    description="Still and always be DERZEN",
+    version="3.0.0",
     docs_url="/docs" if DEBUG else None,  # Disable docs in production
 )
 
@@ -392,7 +393,9 @@ class PipelineRunner:
             "start": self._execute_start,
             "end": self._execute_end,
             "ai_query": self._execute_ai_query,
+            "ai_browser": self._execute_ai_browser,
             "web_scrape": self._execute_web_scrape,
+            "social_analyze": self._execute_social_analyze,
             "email_send": self._execute_email_send,
             "whatsapp_send": self._execute_whatsapp_send,
             "file_save": self._execute_file_save,
@@ -555,8 +558,15 @@ class PipelineRunner:
         return {"response": response}
 
     async def _execute_web_scrape(self, node: Dict, ctx: Dict) -> Dict:
-        """Web Scrape node - scrapes data from URLs."""
-        urls = node.get("config", {}).get("urls", [])
+        """Web Scrape node - scrapes data from one or more URLs."""
+        config = node.get("config", {})
+        urls_text = config.get("urls", "")
+        
+        # Support both string (newline-separated) and list formats
+        if isinstance(urls_text, str):
+            urls = [url.strip() for url in urls_text.split("\\n") if url.strip()]
+        else:
+            urls = urls_text
         
         # Replace variables in URLs
         urls = [self._replace_variables(url, ctx) for url in urls]
@@ -565,11 +575,74 @@ class PipelineRunner:
         for url in urls:
             try:
                 data = await self.browser.navigate(url)
-                results.append(data)
+                results.append({"url": url, **data})
+                logger.info(f"Scraped: {url}")
             except Exception as e:
                 logger.error(f"Scrape failed for {url}: {e}")
+                results.append({"url": url, "error": str(e)})
         
-        return {"scraped": results}
+        # Combine all scraped content
+        combined_content = "\\n\\n---\\n\\n".join([
+            f"Source: {r.get('url', 'unknown')}\\n{r.get('content', r.get('title', ''))}"
+            for r in results if 'error' not in r
+        ])
+        
+        return {
+            "scraped": results,
+            "combined_content": combined_content,
+            "url_count": len(results),
+        }
+
+    async def _execute_ai_browser(self, node: Dict, ctx: Dict) -> Dict:
+        """AI Browser node - interacts with online AI services."""
+        config = node.get("config", {})
+        ai_service = config.get("ai_service", "chatgpt")
+        prompt = self._replace_variables(config.get("prompt", ""), ctx)
+        wait_seconds = int(config.get("wait_seconds", 30))
+        conversation_mode = config.get("conversation_mode", False)
+        
+        try:
+            response = await self.browser.interact_with_ai_service(
+                service=ai_service,
+                prompt=prompt,
+                wait_seconds=wait_seconds,
+                conversation_mode=conversation_mode,
+            )
+            logger.info(f"AI Browser ({ai_service}): Got response")
+            return {
+                "ai_answer": response,
+                "service": ai_service,
+                "prompt": prompt,
+            }
+        except Exception as e:
+            logger.error(f"AI Browser failed: {e}")
+            return {"ai_answer": f"Error: {e}", "service": ai_service, "error": str(e)}
+
+    async def _execute_social_analyze(self, node: Dict, ctx: Dict) -> Dict:
+        """Social Media Analysis node - searches and analyzes social media posts."""
+        config = node.get("config", {})
+        platform = config.get("platform", "twitter")
+        query = self._replace_variables(config.get("query", ""), ctx)
+        post_count = int(config.get("post_count", 10))
+        analyze_sentiment = config.get("analyze_sentiment", True)
+        
+        try:
+            results = await self.browser.analyze_social_media(
+                platform=platform,
+                query=query,
+                post_count=post_count,
+                analyze_sentiment=analyze_sentiment,
+            )
+            logger.info(f"Social Analysis ({platform}): Analyzed {len(results.get('posts', []))} posts")
+            return results
+        except Exception as e:
+            logger.error(f"Social Analysis failed: {e}")
+            return {
+                "posts": [],
+                "platform": platform,
+                "error": str(e),
+                "total_count": 0,
+            }
 
     async def _execute_email_send(self, node: Dict, ctx: Dict) -> Dict:
         """Email Send node - sends email."""
@@ -798,6 +871,225 @@ class BrowserAutomation:
             logger.info(f"WhatsApp message sent to {contact}")
         finally:
             await page.close()
+
+    async def interact_with_ai_service(
+        self,
+        service: str,
+        prompt: str,
+        wait_seconds: int = 30,
+        conversation_mode: bool = False,
+    ) -> str:
+        """
+        Interact with online AI services (ChatGPT, Claude, Gemini, Perplexity).
+        Opens the service website, types the prompt, waits for response.
+        Acts like a human user - no API keys needed.
+        """
+        service_urls = {
+            "chatgpt": "https://chat.openai.com",
+            "claude": "https://claude.ai",
+            "gemini": "https://gemini.google.com",
+            "perplexity": "https://www.perplexity.ai",
+        }
+        
+        url = service_urls.get(service, service_urls["chatgpt"])
+        page = await self.context.new_page()
+        
+        try:
+            logger.info(f"AI Browser: Opening {service} at {url}")
+            await page.goto(url, wait_until="networkidle", timeout=30000)
+            await asyncio.sleep(3)  # Let page fully load
+            
+            # Service-specific selectors (these may need updating as UIs change)
+            selectors = {
+                "chatgpt": {
+                    "input": "textarea, [contenteditable='true']",
+                    "submit": "button[data-testid='send-button'], button[type='submit']",
+                    "response": "[data-message-author-role='assistant']:last-child .markdown",
+                },
+                "claude": {
+                    "input": "div[contenteditable='true'], textarea",
+                    "submit": "button[aria-label='Send Message']",
+                    "response": ".font-claude-message:last-child",
+                },
+                "gemini": {
+                    "input": "textarea, .input-area textarea",
+                    "submit": "button[aria-label='Send message']",
+                    "response": ".response-container:last-child .markdown",
+                },
+                "perplexity": {
+                    "input": "textarea",
+                    "submit": "button[type='submit']",
+                    "response": ".prose:last-child",
+                },
+            }
+            
+            sel = selectors.get(service, selectors["chatgpt"])
+            
+            # Find and fill input
+            input_el = page.locator(sel["input"]).first
+            await input_el.wait_for(timeout=10000)
+            await input_el.fill(prompt)
+            await asyncio.sleep(1)
+            
+            # Click submit
+            submit_btn = page.locator(sel["submit"]).first
+            await submit_btn.click()
+            
+            # Wait for response
+            logger.info(f"AI Browser: Waiting {wait_seconds}s for {service} response...")
+            response_el = page.locator(sel["response"]).first
+            
+            # Wait for response to appear and stabilize
+            await response_el.wait_for(timeout=wait_seconds * 1000)
+            await asyncio.sleep(3)  # Extra wait for response to complete
+            
+            # Extract response text
+            response_text = await response_el.inner_text()
+            
+            logger.info(f"AI Browser: Got response from {service} ({len(response_text)} chars)")
+            return response_text.strip()
+            
+        except Exception as e:
+            logger.error(f"AI Browser failed for {service}: {e}")
+            raise
+        finally:
+            if not conversation_mode:
+                await page.close()
+
+    async def analyze_social_media(
+        self,
+        platform: str,
+        query: str,
+        post_count: int = 10,
+        analyze_sentiment: bool = True,
+    ) -> Dict:
+        """
+        Search and analyze social media posts.
+        Supports Twitter/X, Instagram, LinkedIn, Facebook.
+        """
+        platform_urls = {
+            "twitter": "https://twitter.com/search",
+            "instagram": "https://www.instagram.com/explore/tags",
+            "linkedin": "https://www.linkedin.com/search/results/content",
+            "facebook": "https://www.facebook.com/search/posts",
+        }
+        
+        url = platform_urls.get(platform, platform_urls["twitter"])
+        page = await self.context.new_page()
+        
+        try:
+            logger.info(f"Social Analysis: Searching {platform} for '{query}'")
+            
+            # Navigate with search query
+            if platform == "twitter":
+                await page.goto(f"{url}?q={query}&src=typed_query", wait_until="networkidle")
+            elif platform == "instagram":
+                await page.goto(f"{url}/{query.replace(' ', '')}", wait_until="networkidle")
+            elif platform == "linkedin":
+                await page.goto(f"{url}?keywords={query}", wait_until="networkidle")
+            elif platform == "facebook":
+                await page.goto(f"{url}?q={query}", wait_until="networkidle")
+            
+            await asyncio.sleep(3)
+            
+            # Platform-specific post extraction
+            posts = []
+            
+            if platform == "twitter":
+                # Extract tweets
+                tweet_els = page.locator("[data-testid='tweet']").locator("xpath=..")
+                count = min(await tweet_els.count(), post_count)
+                
+                for i in range(count):
+                    try:
+                        tweet = tweet_els.nth(i)
+                        text = await tweet.locator("[data-testid='tweetText']").inner_text()
+                        author = await tweet.locator("[data-testid='User-Name']").inner_text()
+                        
+                        post_data = {
+                            "platform": platform,
+                            "author": author.split("\\n")[0] if author else "Unknown",
+                            "content": text,
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                        
+                        if analyze_sentiment:
+                            post_data["sentiment"] = await self._analyze_sentiment(text)
+                        
+                        posts.append(post_data)
+                    except Exception as e:
+                        logger.debug(f"Failed to extract tweet {i}: {e}")
+                        continue
+            
+            elif platform == "linkedin":
+                # Extract LinkedIn posts
+                post_els = page.locator(".feed-shared-update-v2")
+                count = min(await post_els.count(), post_count)
+                
+                for i in range(count):
+                    try:
+                        post = post_els.nth(i)
+                        text = await post.locator(".feed-shared-text").inner_text()
+                        author = await post.locator(".feed-shared-actor__description").inner_text()
+                        
+                        post_data = {
+                            "platform": platform,
+                            "author": author.split("\\n")[0] if author else "Unknown",
+                            "content": text[:500],  # Limit length
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                        
+                        if analyze_sentiment:
+                            post_data["sentiment"] = await self._analyze_sentiment(text)
+                        
+                        posts.append(post_data)
+                    except Exception as e:
+                        logger.debug(f"Failed to extract LinkedIn post {i}: {e}")
+                        continue
+            
+            # Calculate sentiment summary
+            sentiment_summary = {}
+            if analyze_sentiment and posts:
+                sentiments = [p.get("sentiment", "neutral") for p in posts]
+                sentiment_summary = {
+                    "positive": sentiments.count("positive"),
+                    "negative": sentiments.count("negative"),
+                    "neutral": sentiments.count("neutral"),
+                    "overall": max(set(sentiments), key=sentiments.count),
+                }
+            
+            logger.info(f"Social Analysis: Found {len(posts)} posts on {platform}")
+            
+            return {
+                "posts": posts,
+                "platform": platform,
+                "query": query,
+                "total_count": len(posts),
+                "sentiment_summary": sentiment_summary,
+            }
+            
+        except Exception as e:
+            logger.error(f"Social Analysis failed for {platform}: {e}")
+            raise
+        finally:
+            await page.close()
+
+    async def _analyze_sentiment(self, text: str) -> str:
+        """Simple sentiment analysis using keyword matching."""
+        text_lower = text.lower()
+        
+        positive_words = ["great", "awesome", "excellent", "amazing", "love", "best", "good", "happy", "wonderful", "fantastic"]
+        negative_words = ["bad", "terrible", "awful", "hate", "worst", "horrible", "poor", "sad", "angry", "disappointed"]
+        
+        positive_count = sum(1 for word in positive_words if word in text_lower)
+        negative_count = sum(1 for word in negative_words if word in text_lower)
+        
+        if positive_count > negative_count:
+            return "positive"
+        elif negative_count > positive_count:
+            return "negative"
+        else:
+            return "neutral"
 `
   },
   {

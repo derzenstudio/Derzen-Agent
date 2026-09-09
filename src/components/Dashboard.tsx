@@ -46,15 +46,15 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       {/* Hero */}
       <div style={{ marginBottom: '4rem', paddingTop: '2rem' }}>
         <h1 style={{ fontSize: 'clamp(2.5rem, 6vw, 5rem)', marginBottom: '0.5rem' }}>
-          AI AUTOMATION
+          DERZEN
         </h1>
-        <h1 style={{ fontSize: 'clamp(2.5rem, 6vw, 5rem)', color: 'var(--accent)', marginBottom: '1.5rem' }}>
-          HUB
-        </h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '1.125rem', maxWidth: '600px' }}>
-          A centralized, locally-hosted AI agent that controls Chrome, manages files,
-          runs offline AI models, and communicates via WhatsApp and Email.
-          Built for a dedicated Windows device with full security sandboxing.
+        <p style={{ color: 'var(--text-secondary)', fontSize: '1.25rem', fontStyle: 'italic', marginBottom: '1.5rem' }}>
+          Still and always be DERZEN
+        </p>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '1.125rem', maxWidth: '700px' }}>
+          Build powerful automation pipelines that scrape websites, analyze social media, 
+          interact with online AI services, and deliver results via email or WhatsApp.
+          All running locally on your Windows device with complete security.
         </p>
       </div>
 
