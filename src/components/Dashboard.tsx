@@ -6,7 +6,7 @@ interface DashboardProps {
 }
 
 const navCards = [
-  { page: 'pipeline-builder' as Page, title: 'Pipeline Builder', desc: 'Visual drag-and-drop pipeline creation with branching' },
+  { page: 'pipeline-builder' as Page, title: 'Build a Pipeline', desc: 'Create automations visually — no coding needed. Start from a template or describe what you want in plain English.' },
   { page: 'architecture' as Page, title: 'System Architecture', desc: 'How all components connect and communicate' },
   { page: 'code' as Page, title: 'Source Code', desc: 'Complete Python codebase with security hardening' },
   { page: 'setup' as Page, title: 'Deployment Guide', desc: 'Step-by-step from download to running system' },
@@ -208,7 +208,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 function SectionPreview({ page, onEnter }: { page: Page; onEnter: () => void }) {
   const previews: Record<Page, string> = {
     dashboard: '',
-    'pipeline-builder': 'Visual drag-and-drop pipeline builder. Create automation workflows by dragging nodes, connecting them, and configuring properties. Supports branching logic and AI-generated pipelines from text prompts.',
+    'pipeline-builder': 'Build automations without writing a single line of code. Choose from ready-made templates, describe what you want in plain English, or drag-and-drop steps onto a canvas. Includes undo/redo, live testing, and branching logic with YES/NO paths.',
     architecture: 'View the complete system architecture showing how FastAPI, Playwright, Ollama, IMAP, and WhatsApp Web all interconnect through the central hub. Includes data flow diagrams and communication protocols.',
     code: 'Browse the complete Python codebase including security-hardened main.py, automation.py with sandboxed file operations, ai_manager.py with Ollama integration, and event-driven listeners with whitelist enforcement.',
     setup: 'Complete step-by-step guide from downloading all files, organizing the directory structure, installing dependencies, configuring credentials, and launching the system for the first time.',
