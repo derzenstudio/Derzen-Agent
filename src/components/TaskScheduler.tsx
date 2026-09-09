@@ -1,74 +1,21 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Play, Pause, Clock, RotateCcw, Calendar, Zap, CheckCircle2, AlertCircle } from 'lucide-react';
 
-interface ScheduledJob {
-  id: string;
-  name: string;
-  schedule: string;
-  nextRun: string;
-  status: 'active' | 'paused' | 'completed' | 'error';
-  lastRun?: string;
-  steps: number;
-}
-
-interface PipelineLog {
-  id: number;
-  timestamp: string;
-  step: string;
-  status: 'success' | 'running' | 'pending' | 'error';
-  duration?: string;
-  details: string;
-}
-
-const mockJobs: ScheduledJob[] = [
-  {
-    id: 'sunday_pipeline',
-    name: 'Sunday Research & Report Pipeline',
-    schedule: 'Every Sunday at 9:00 AM',
-    nextRun: '2025-01-19 09:00:00',
-    status: 'active',
-    lastRun: '2025-01-12 09:00:15',
-    steps: 8,
-  },
-  {
-    id: 'email_check',
-    name: 'Email Inbox Monitor',
-    schedule: 'Every 30 seconds',
-    nextRun: 'Continuous',
-    status: 'active',
-    lastRun: '2025-01-15 14:32:00',
-    steps: 1,
-  },
-  {
-    id: 'whatsapp_check',
-    name: 'WhatsApp Message Monitor',
-    schedule: 'Every 5 seconds',
-    nextRun: 'Continuous',
-    status: 'active',
-    lastRun: '2025-01-15 14:32:05',
-    steps: 1,
-  },
-  {
-    id: 'model_update',
-    name: 'Model Update Check',
-    schedule: 'Every Monday at 2:00 AM',
-    nextRun: '2025-01-20 02:00:00',
-    status: 'paused',
-    lastRun: '2025-01-13 02:00:00',
-    steps: 3,
-  },
+const jobs = [
+  { id: 'sunday_pipeline', name: 'Sunday Research & Report Pipeline', schedule: 'Every Sunday at 9:00 AM', nextRun: '2025-01-19 09:00:00', status: 'active' as const, lastRun: '2025-01-12 09:00:15', steps: 8 },
+  { id: 'email_check', name: 'Email Inbox Monitor', schedule: 'Every 30 seconds', nextRun: 'Continuous', status: 'active' as const, lastRun: '2025-01-15 14:32:00', steps: 1 },
+  { id: 'whatsapp_check', name: 'WhatsApp Message Monitor', schedule: 'Every 5 seconds', nextRun: 'Continuous', status: 'active' as const, lastRun: '2025-01-15 14:32:05', steps: 1 },
+  { id: 'model_update', name: 'Model Update Check', schedule: 'Every Monday at 2:00 AM', nextRun: '2025-01-20 02:00:00', status: 'paused' as const, lastRun: '2025-01-13 02:00:00', steps: 3 },
 ];
 
-const mockPipelineLog: PipelineLog[] = [
-  { id: 1, timestamp: '09:00:00', step: 'Pipeline Started', status: 'success', duration: '0.1s', details: 'Scheduler triggered the pipeline' },
-  { id: 2, timestamp: '09:00:01', step: 'Research Phase', status: 'success', duration: '45.2s', details: 'Opened 3 tabs: arxiv.org, huggingface.co, github.com' },
-  { id: 3, timestamp: '09:00:46', step: 'Data Scraping', status: 'success', duration: '23.8s', details: 'Scraped 47 items across all sources' },
-  { id: 4, timestamp: '09:01:10', step: 'AI Analysis', status: 'success', duration: '12.4s', details: 'Model: llama3.2 — Identified 5 themes, scored all items' },
-  { id: 5, timestamp: '09:01:22', step: 'Report Generation', status: 'success', duration: '3.2s', details: 'Generated weekly_report_20250112.xlsx (38 items)' },
-  { id: 6, timestamp: '09:01:25', step: 'Brand Styling', status: 'success', duration: '1.8s', details: 'Applied company brand guide (colors, fonts, borders)' },
-  { id: 7, timestamp: '09:01:27', step: 'Image Fetching', status: 'success', duration: '18.5s', details: 'Downloaded 8 images from Google Drive "Brand Assets"' },
-  { id: 8, timestamp: '09:01:46', step: 'Summary & Delivery', status: 'success', duration: '8.3s', details: 'Email sent to 3 recipients, WhatsApp message sent' },
+const pipelineLog = [
+  { id: 1, time: '09:00:00', step: 'Pipeline Started', status: 'success' as const, duration: '0.1s', details: 'Scheduler triggered the pipeline' },
+  { id: 2, time: '09:00:01', step: 'Research Phase', status: 'success' as const, duration: '45.2s', details: 'Opened 3 tabs: arxiv.org, huggingface.co, github.com' },
+  { id: 3, time: '09:00:46', step: 'Data Scraping', status: 'success' as const, duration: '23.8s', details: 'Scraped 47 items across all sources' },
+  { id: 4, time: '09:01:10', step: 'AI Analysis', status: 'success' as const, duration: '2m 24s', details: 'Model: llama3.2 (CPU) — Identified 5 themes, scored all items' },
+  { id: 5, time: '09:03:34', step: 'Report Generation', status: 'success' as const, duration: '3.2s', details: 'Generated weekly_report_20250112.xlsx (38 items)' },
+  { id: 6, time: '09:03:37', step: 'Brand Styling', status: 'success' as const, duration: '1.8s', details: 'Applied company brand guide (colors, fonts, borders)' },
+  { id: 7, time: '09:03:39', step: 'Image Fetching', status: 'success' as const, duration: '18.5s', details: 'Downloaded 8 images from Google Drive "Brand Assets"' },
+  { id: 8, time: '09:03:58', step: 'Summary & Delivery', status: 'success' as const, duration: '32.3s', details: 'Email sent to 3 recipients, WhatsApp message sent' },
 ];
 
 export default function TaskScheduler() {
@@ -81,189 +28,226 @@ export default function TaskScheduler() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex items-start justify-between">
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
         <div>
-          <h1 className="text-3xl font-bold text-white">Task Scheduler</h1>
-          <p className="text-gray-400 mt-1">
+          <h1>TASK SCHEDULER</h1>
+          <p style={{ color: 'var(--text-secondary)' }}>
             Manage scheduled jobs and monitor pipeline execution
           </p>
         </div>
         <button
+          className="btn btn-primary"
           onClick={handleTriggerPipeline}
           disabled={pipelineRunning}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-            pipelineRunning
-              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 cursor-wait'
-              : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-          }`}
+          style={{ opacity: pipelineRunning ? 0.5 : 1 }}
         >
-          {pipelineRunning ? (
-            <>
-              <RotateCcw size={16} className="animate-spin" />
-              Running...
-            </>
-          ) : (
-            <>
-              <Play size={16} />
-              Trigger Pipeline Now
-            </>
-          )}
+          {pipelineRunning ? 'RUNNING...' : 'TRIGGER PIPELINE NOW'}
         </button>
       </div>
 
       {/* Scheduled Jobs */}
-      <div>
-        <h2 className="text-lg font-semibold text-white mb-3">Scheduled Jobs</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {mockJobs.map((job) => (
-            <motion.button
-              key={job.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              onClick={() => setSelectedJob(job.id)}
-              className={`text-left p-4 rounded-xl border transition-all ${
-                selectedJob === job.id
-                  ? 'bg-gray-800 border-emerald-500/30'
-                  : 'bg-gray-900 border-gray-800 hover:border-gray-700'
-              }`}
-            >
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${
-                    job.status === 'active' ? 'bg-emerald-400' :
-                    job.status === 'paused' ? 'bg-amber-400' :
-                    job.status === 'error' ? 'bg-red-400' : 'bg-gray-400'
-                  }`} />
-                  <h3 className="text-sm font-semibold text-white">{job.name}</h3>
-                </div>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-                  job.status === 'active' ? 'bg-emerald-500/10 text-emerald-400' :
-                  job.status === 'paused' ? 'bg-amber-500/10 text-amber-400' :
-                  'bg-gray-500/10 text-gray-400'
-                }`}>
-                  {job.status}
-                </span>
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-xs text-gray-400">
-                  <Calendar size={11} />
-                  {job.schedule}
-                </div>
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <Clock size={11} />
-                  Next: {job.nextRun}
-                </div>
-                {job.lastRun && (
-                  <div className="flex items-center gap-2 text-[10px] text-gray-600">
-                    Last run: {job.lastRun}
-                  </div>
-                )}
-              </div>
-            </motion.button>
-          ))}
-        </div>
+      <h2>SCHEDULED JOBS</h2>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem', marginBottom: '3rem' }}>
+        {jobs.map((job) => (
+          <div
+            key={job.id}
+            onClick={() => setSelectedJob(job.id)}
+            style={{
+              background: selectedJob === job.id ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
+              border: `1px solid ${selectedJob === job.id ? 'var(--accent)' : 'var(--border)'}`,
+              padding: '1.5rem',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <h3 style={{ fontSize: '1rem', marginBottom: 0 }}>{job.name}</h3>
+              <span className={`status-badge status-${job.status}`}>{job.status}</span>
+            </div>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+              {job.schedule}
+            </p>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 0 }}>
+              Next: {job.nextRun} | Last: {job.lastRun}
+            </p>
+          </div>
+        ))}
       </div>
 
       {/* Pipeline Execution Log */}
-      <div>
-        <h2 className="text-lg font-semibold text-white mb-3">
-          Pipeline Execution Log
-          <span className="text-xs text-gray-500 ml-2 font-normal">Last run: Jan 12, 2025</span>
-        </h2>
-        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-          {/* Pipeline Steps Visualization */}
-          <div className="px-4 py-3 bg-gray-800/50 border-b border-gray-800">
-            <div className="flex items-center gap-1">
-              {mockPipelineLog.map((log, i) => (
-                <div key={log.id} className="flex items-center gap-1 flex-1">
-                  <div className={`h-1.5 flex-1 rounded-full ${
-                    log.status === 'success' ? 'bg-emerald-500' :
-                    log.status === 'running' ? 'bg-amber-500 animate-pulse' :
-                    log.status === 'error' ? 'bg-red-500' : 'bg-gray-700'
-                  }`} />
-                  {i < mockPipelineLog.length - 1 && <div className="w-0.5" />}
-                </div>
-              ))}
+      <h2>PIPELINE EXECUTION LOG</h2>
+      <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+        Last run: January 12, 2025 — Total time: 4 minutes 30 seconds
+      </p>
+
+      {/* Progress Bar */}
+      <div style={{ display: 'flex', gap: '2px', marginBottom: '1.5rem' }}>
+        {pipelineLog.map((log) => (
+          <div
+            key={log.id}
+            style={{
+              flex: 1,
+              height: '6px',
+              background: log.status === 'success' ? 'var(--success)' :
+                          log.status === 'running' ? 'var(--warning)' :
+                          log.status === 'error' ? 'var(--danger)' : 'var(--border)',
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Log Entries */}
+      <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', marginBottom: '2rem' }}>
+        {pipelineLog.map((log, i) => (
+          <div key={log.id} style={{
+            display: 'grid',
+            gridTemplateColumns: '80px 1fr 80px 100px',
+            gap: '1rem',
+            padding: '1rem 1.5rem',
+            borderBottom: i < pipelineLog.length - 1 ? '1px solid var(--border)' : 'none',
+            alignItems: 'center',
+          }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: "'Courier New', monospace" }}>
+              {log.time}
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
+                <span style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: log.status === 'success' ? 'var(--success)' :
+                              log.status === 'running' ? 'var(--warning)' :
+                              log.status === 'error' ? 'var(--danger)' : 'var(--text-muted)',
+                  flexShrink: 0,
+                }} />
+                <span style={{ fontWeight: 800, fontSize: '0.875rem' }}>{log.step}</span>
+              </div>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 0, paddingLeft: '1.25rem' }}>
+                {log.details}
+              </p>
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'var(--bg-tertiary)', padding: '0.25rem 0.5rem', textAlign: 'center' }}>
+              {log.duration}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--success)', textAlign: 'right' }}>
+              {log.status === 'success' ? 'DONE' : String(log.status).toUpperCase()}
             </div>
           </div>
+        ))}
 
-          {/* Log Entries */}
-          <div className="divide-y divide-gray-800/50">
-            {mockPipelineLog.map((log, i) => (
-              <motion.div
-                key={log.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="flex items-center gap-4 px-4 py-3 hover:bg-gray-800/30 transition-colors"
-              >
-                <div className="flex-shrink-0">
-                  {log.status === 'success' ? (
-                    <CheckCircle2 size={16} className="text-emerald-400" />
-                  ) : log.status === 'running' ? (
-                    <RotateCcw size={16} className="text-amber-400 animate-spin" />
-                  ) : log.status === 'error' ? (
-                    <AlertCircle size={16} className="text-red-400" />
-                  ) : (
-                    <Clock size={16} className="text-gray-500" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-white">{log.step}</span>
-                    {log.duration && (
-                      <span className="text-[10px] text-gray-500 bg-gray-800 px-1.5 py-0.5 rounded">
-                        {log.duration}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-400 mt-0.5">{log.details}</p>
-                </div>
-                <span className="text-[10px] text-gray-600 font-mono flex-shrink-0">{log.timestamp}</span>
-              </motion.div>
-            ))}
-          </div>
-
-          {/* Summary */}
-          <div className="px-4 py-3 bg-gray-800/30 border-t border-gray-800 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <span className="text-xs text-gray-400">
-                <Zap size={12} className="inline mr-1 text-amber-400" />
-                Total: 113.3s
-              </span>
-              <span className="text-xs text-gray-400">
-                <CheckCircle2 size={12} className="inline mr-1 text-emerald-400" />
-                8/8 steps completed
-              </span>
-            </div>
-            <span className="text-xs text-emerald-400 font-medium">Pipeline Successful</span>
-          </div>
+        {/* Summary */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem 1.5rem', background: 'var(--bg-tertiary)', borderTop: '1px solid var(--border)' }}>
+          <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+            Total: 4m 30s | 8/8 steps completed
+          </span>
+          <span style={{ fontSize: '0.875rem', color: 'var(--success)', fontWeight: 800 }}>
+            PIPELINE SUCCESSFUL
+          </span>
         </div>
       </div>
 
+      {/* Timing Breakdown */}
+      <h2>TIMING BREAKDOWN (CPU-ONLY, 16GB RAM)</h2>
+      <div className="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Pipeline Step</th>
+              <th>Duration</th>
+              <th>Bottleneck</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Research (3 tabs)</td>
+              <td>~45 seconds</td>
+              <td>Network</td>
+              <td>Page load times</td>
+            </tr>
+            <tr>
+              <td>Data Scraping</td>
+              <td>~25 seconds</td>
+              <td>Network</td>
+              <td>DOM parsing</td>
+            </tr>
+            <tr>
+              <td>AI Analysis</td>
+              <td style={{ color: 'var(--warning)', fontWeight: 800 }}>~2.5 minutes</td>
+              <td style={{ color: 'var(--warning)' }}>CPU (AI)</td>
+              <td>50 items × llama3.2 @ 5-10 tok/s</td>
+            </tr>
+            <tr>
+              <td>Report Generation</td>
+              <td>~3 seconds</td>
+              <td>Disk I/O</td>
+              <td>OpenPyXL write</td>
+            </tr>
+            <tr>
+              <td>Brand Styling</td>
+              <td>~2 seconds</td>
+              <td>CPU</td>
+              <td>Cell formatting</td>
+            </tr>
+            <tr>
+              <td>Image Fetching</td>
+              <td>~20 seconds</td>
+              <td>Network</td>
+              <td>Google Drive download</td>
+            </tr>
+            <tr>
+              <td>Summary Generation</td>
+              <td style={{ color: 'var(--warning)', fontWeight: 800 }}>~30 seconds</td>
+              <td style={{ color: 'var(--warning)' }}>CPU (AI)</td>
+              <td>~500 tokens @ 5-10 tok/s</td>
+            </tr>
+            <tr>
+              <td>Email + WhatsApp Send</td>
+              <td>~30 seconds</td>
+              <td>Network</td>
+              <td>SMTP + WhatsApp Web</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div className="alert alert-info" style={{ marginTop: '1.5rem' }}>
+        <p style={{ marginBottom: '0.5rem' }}>PERFORMANCE NOTE</p>
+        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 0 }}>
+          AI inference is the primary bottleneck on CPU-only systems. The llama3.2 model generates
+          approximately 5-10 tokens per second on a modern quad-core CPU with 16GB RAM.
+          Switching to phi-2 (2.7B) or tinyllama (1.1B) can increase this to 15-25 tokens/second,
+          reducing total pipeline time to 8-12 minutes. Adding an NVIDIA GPU would reduce AI steps by 80-90%.
+        </p>
+      </div>
+
       {/* Scheduler Configuration */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-white mb-3">Scheduler Configuration</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <label className="text-[10px] text-gray-500 uppercase tracking-wider">Pipeline Schedule</label>
-            <div className="bg-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 font-mono">
-              CronTrigger(day_of_week="sun", hour=9, minute=0)
-            </div>
-          </div>
-          <div className="space-y-2">
-            <label className="text-[10px] text-gray-500 uppercase tracking-wider">Email Check Interval</label>
-            <div className="bg-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 font-mono">
-              interval=30 seconds
-            </div>
-          </div>
-          <div className="space-y-2">
-            <label className="text-[10px] text-gray-500 uppercase tracking-wider">WhatsApp Check Interval</label>
-            <div className="bg-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 font-mono">
-              interval=5 seconds
-            </div>
-          </div>
+      <div style={{ marginTop: '2rem' }}>
+        <h3>SCHEDULER CONFIGURATION</h3>
+        <div className="code-block" data-lang="PYTHON">
+          <pre>{`# APScheduler configuration in main.py
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+
+scheduler = AsyncIOScheduler()
+
+# Sunday 9 AM Pipeline
+scheduler.add_job(
+    run_sunday_pipeline,
+    CronTrigger(day_of_week="sun", hour=9, minute=0),
+    id="sunday_pipeline",
+    name="Sunday Research & Report Pipeline",
+)
+
+# Email check every 30 seconds
+# (Handled by async loop in email_listener.py)
+
+# WhatsApp check every 5 seconds
+# (Handled by async loop in whatsapp_listener.py)
+
+scheduler.start()`}</pre>
         </div>
       </div>
     </div>

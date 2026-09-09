@@ -1,6 +1,4 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import Architecture from './components/Architecture';
 import CodeViewer from './components/CodeViewer';
@@ -12,49 +10,43 @@ export type Page = 'dashboard' | 'architecture' | 'code' | 'setup' | 'files' | '
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [systemStopped, setSystemStopped] = useState(false);
 
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'dashboard':
-        return <Dashboard onNavigate={setCurrentPage} />;
-      case 'architecture':
-        return <Architecture />;
-      case 'code':
-        return <CodeViewer />;
-      case 'setup':
-        return <SetupGuide />;
-      case 'files':
-        return <FileManager />;
-      case 'scheduler':
-        return <TaskScheduler />;
-      default:
-        return <Dashboard onNavigate={setCurrentPage} />;
-    }
+  const handleEmergencyStop = () => {
+    setSystemStopped(true);
+    setTimeout(() => setSystemStopped(false), 3000);
   };
 
   return (
-    <div className="flex h-screen bg-gray-950 text-gray-100 overflow-hidden">
-      <Sidebar
-        currentPage={currentPage}
-        onNavigate={setCurrentPage}
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-      />
-      <main className={`flex-1 overflow-y-auto transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-16'}`}>
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentPage}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="p-6 lg:p-8"
+    <div>
+      {/* Emergency Stop Button */}
+      <button
+        className="emergency-stop"
+        onClick={handleEmergencyStop}
+        title="Immediately stop all automation tasks"
+      >
+        {systemStopped ? 'SYSTEM STOPPED' : 'EMERGENCY STOP'}
+      </button>
+
+      <div className="container">
+        {currentPage === 'dashboard' && (
+          <Dashboard onNavigate={setCurrentPage} />
+        )}
+        {currentPage !== 'dashboard' && (
+          <button
+            className="btn btn-secondary"
+            onClick={() => setCurrentPage('dashboard')}
+            style={{ marginBottom: '2rem' }}
           >
-            {renderPage()}
-          </motion.div>
-        </AnimatePresence>
-      </main>
+            BACK TO DASHBOARD
+          </button>
+        )}
+        {currentPage === 'architecture' && <Architecture />}
+        {currentPage === 'code' && <CodeViewer />}
+        {currentPage === 'setup' && <SetupGuide />}
+        {currentPage === 'files' && <FileManager />}
+        {currentPage === 'scheduler' && <TaskScheduler />}
+      </div>
     </div>
   );
 }

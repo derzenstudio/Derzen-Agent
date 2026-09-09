@@ -1,192 +1,4 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { CheckCircle2, Circle, Terminal, Download, Key, Power, Globe, AlertTriangle } from 'lucide-react';
-
-interface Step {
-  id: number;
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  commands?: string[];
-  notes?: string[];
-}
-
-const steps: Step[] = [
-  {
-    id: 1,
-    title: 'Install Prerequisites',
-    description: 'Install Python 3.10+, Node.js (optional), and Git on your Windows machine.',
-    icon: <Download size={20} />,
-    commands: [
-      '# Download Python from python.org (3.10+)',
-      '# Or use winget:',
-      'winget install Python.Python.3.11',
-      '',
-      '# Verify installation:',
-      'python --version',
-      'pip --version',
-    ],
-    notes: [
-      'Make sure to check "Add Python to PATH" during installation',
-      'Python 3.10 or higher is required',
-      'Git is needed for cloning repositories',
-    ],
-  },
-  {
-    id: 2,
-    title: 'Install Ollama',
-    description: 'Download and install Ollama for running local AI models offline.',
-    icon: <Globe size={20} />,
-    commands: [
-      '# Download from https://ollama.ai',
-      '# Or via winget:',
-      'winget install Ollama.Ollama',
-      '',
-      '# Start Ollama service:',
-      'ollama serve',
-      '',
-      '# Pull a model (in another terminal):',
-      'ollama pull llama3.2',
-      'ollama pull mistral',
-    ],
-    notes: [
-      'Ollama runs as a background service on Windows',
-      'llama3.2 is recommended for general tasks',
-      'Requires at least 8GB RAM (16GB recommended)',
-      'GPU acceleration is automatic if NVIDIA drivers are installed',
-    ],
-  },
-  {
-    id: 3,
-    title: 'Clone & Setup Project',
-    description: 'Clone the repository and set up the Python virtual environment.',
-    icon: <Terminal size={20} />,
-    commands: [
-      '# Clone the project:',
-      'git clone https://github.com/your-repo/ai-automation-hub.git',
-      'cd ai-automation-hub',
-      '',
-      '# Create virtual environment:',
-      'python -m venv venv',
-      '',
-      '# Activate virtual environment:',
-      'venv\\Scripts\\activate',
-      '',
-      '# Install dependencies:',
-      'pip install -r requirements.txt',
-    ],
-    notes: [
-      'Always activate the virtual environment before running',
-      'The venv folder should not be committed to git',
-    ],
-  },
-  {
-    id: 4,
-    title: 'Install Playwright Browsers',
-    description: 'Install the Chromium browser that Playwright will control.',
-    icon: <Globe size={20} />,
-    commands: [
-      '# Install Playwright browsers:',
-      'playwright install chromium',
-      '',
-      '# Or install all browsers:',
-      'playwright install',
-      '',
-      '# Verify:',
-      'playwright --version',
-    ],
-    notes: [
-      'Chromium is required for all automation tasks',
-      'The browser runs in non-headless mode by default',
-      'Persistent context saves login sessions between runs',
-    ],
-  },
-  {
-    id: 5,
-    title: 'Configure Environment',
-    description: 'Set up your email, WhatsApp, and system configuration.',
-    icon: <Key size={20} />,
-    commands: [
-      '# Copy the template:',
-      'copy .env.example .env',
-      '',
-      '# Edit .env with your settings:',
-      'notepad .env',
-    ],
-    notes: [
-      'For Gmail: Create an App Password at myaccount.google.com/apppasswords',
-      'IMAP must be enabled in Gmail settings',
-      'WhatsApp Web must be logged in on first run',
-      'Add trusted contacts to the whitelist',
-      'Set your preferred AI model (default: llama3.2)',
-    ],
-  },
-  {
-    id: 6,
-    title: 'First Run & WhatsApp Login',
-    description: 'Run the server for the first time to set up WhatsApp Web session.',
-    icon: <Power size={20} />,
-    commands: [
-      '# Make sure Ollama is running:',
-      'ollama serve',
-      '',
-      '# Start the AI Hub:',
-      'python main.py',
-      '',
-      '# Server starts at http://localhost:8000',
-      '# Chrome will open for WhatsApp login',
-    ],
-    notes: [
-      'On first run, scan the QR code in Chrome to log into WhatsApp Web',
-      'The session is saved in C:/AI_Automation/BrowserData/',
-      'Subsequent runs will reuse the saved session',
-      'The dashboard UI is available at localhost:8000',
-    ],
-  },
-  {
-    id: 7,
-    title: 'Verify All Systems',
-    description: 'Check that all modules are running correctly.',
-    icon: <CheckCircle2 size={20} />,
-    commands: [
-      '# Check API status:',
-      'curl http://localhost:8000/api/status',
-      '',
-      '# Test AI query:',
-      'curl -X POST "http://localhost:8000/api/ai/query?prompt=Hello"',
-      '',
-      '# Check file manager:',
-      'curl http://localhost:8000/api/files/list',
-    ],
-    notes: [
-      'All modules should show as initialized in the status response',
-      'The scheduler should show the Sunday 9 AM job',
-      'Email and WhatsApp listeners should be active',
-    ],
-  },
-  {
-    id: 8,
-    title: 'Set Up Auto-Start (Optional)',
-    description: 'Configure the system to start automatically on Windows boot.',
-    icon: <Power size={20} />,
-    commands: [
-      '# Create a batch file for startup:',
-      'echo @echo off > start_hub.bat',
-      'echo cd C:\\path\\to\\ai-automation-hub >> start_hub.bat',
-      'echo call venv\\Scripts\\activate >> start_hub.bat',
-      'echo ollama serve ^& start /b python main.py >> start_hub.bat',
-      '',
-      '# Add to Windows Task Scheduler:',
-      '# Or place shortcut in: shell:startup',
-    ],
-    notes: [
-      'Use Windows Task Scheduler for more control',
-      'Set the task to run at system startup',
-      'Ensure Ollama starts before the main app',
-      'Consider running as a Windows Service for production',
-    ],
-  },
-];
 
 export default function SetupGuide() {
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
@@ -201,112 +13,385 @@ export default function SetupGuide() {
     });
   };
 
-  const progress = (completedSteps.size / steps.length) * 100;
+  const progress = (completedSteps.size / 10) * 100;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-white">Setup Guide</h1>
-        <p className="text-gray-400 mt-1">
-          Step-by-step deployment instructions for Windows
-        </p>
-      </div>
+    <div>
+      <h1>DEPLOYMENT GUIDE</h1>
+      <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
+        Complete step-by-step instructions from downloading files to running the system
+      </p>
 
-      {/* Progress Bar */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-gray-400">Setup Progress</span>
-          <span className="text-xs text-emerald-400 font-medium">{completedSteps.size}/{steps.length} completed</span>
+      {/* Progress */}
+      <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', padding: '1.5rem', marginBottom: '3rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+          <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Setup Progress</span>
+          <span style={{ fontSize: '0.875rem', color: 'var(--accent)', fontWeight: 800 }}>
+            {completedSteps.size}/10 completed
+          </span>
         </div>
-        <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
-          <motion.div
-            className="h-full bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full"
-            initial={{ width: 0 }}
-            animate={{ width: `${progress}%` }}
-            transition={{ duration: 0.5 }}
-          />
+        <div className="progress-container">
+          <div className="progress-bar" style={{ width: `${progress}%` }} />
         </div>
       </div>
 
-      {/* Warning */}
-      <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 flex gap-3">
-        <AlertTriangle size={20} className="text-amber-400 flex-shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm text-amber-200 font-medium">Prerequisites</p>
-          <p className="text-xs text-amber-200/70 mt-1">
-            This system requires a dedicated Windows device with at least 16GB RAM, 
-            an NVIDIA GPU (recommended for AI), and unrestricted file system access.
-            Email credentials and WhatsApp Web login are required.
-          </p>
-        </div>
+      {/* Prerequisites */}
+      <div className="alert alert-warning" style={{ marginBottom: '3rem' }}>
+        <p style={{ marginBottom: '0.5rem' }}>PREREQUISITES</p>
+        <ul style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', paddingLeft: '1.5rem', marginBottom: 0 }}>
+          <li>Windows 10/11 with at least 16GB RAM</li>
+          <li>Python 3.10 or higher installed</li>
+          <li>Administrator access (for creating directories)</li>
+          <li>Gmail account with App Password enabled</li>
+          <li>WhatsApp account (for WhatsApp Web automation)</li>
+          <li>Stable internet connection (for initial setup)</li>
+        </ul>
       </div>
 
       {/* Steps */}
-      <div className="space-y-3">
-        {steps.map((step) => (
-          <motion.div
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {[
+          {
+            id: 1,
+            title: 'Download All Project Files',
+            content: (
+              <div>
+                <p style={{ marginBottom: '1rem' }}>Create a new folder and download all project files:</p>
+                <div className="code-block" data-lang="CMD">
+                  <pre>{`# Create project directory
+mkdir C:\\AI_Automation_Project
+cd C:\\AI_Automation_Project
+
+# Download files (or copy from this dashboard)
+# You need these files:
+# - main.py
+# - automation.py
+# - ai_manager.py
+# - email_listener.py
+# - whatsapp_listener.py
+# - file_manager.py
+# - requirements.txt
+# - .env.example`}</pre>
+                </div>
+                <p style={{ marginTop: '1rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  Copy each file from the Source Code section and save them in C:\AI_Automation_Project\
+                </p>
+              </div>
+            ),
+          },
+          {
+            id: 2,
+            title: 'Create Runtime Directories',
+            content: (
+              <div>
+                <p style={{ marginBottom: '1rem' }}>Create the sandboxed directory structure:</p>
+                <div className="code-block" data-lang="CMD">
+                  <pre>{`# Create runtime directories
+mkdir C:\\AI_Automation
+mkdir C:\\AI_Automation\\Downloads
+mkdir C:\\AI_Automation\\Reports
+mkdir C:\\AI_Automation\\Models
+mkdir C:\\AI_Automation\\Assets
+mkdir C:\\AI_Automation\\Logs
+mkdir C:\\AI_Automation\\BrowserData
+mkdir C:\\AI_Automation\\Screenshots
+
+# Verify structure
+dir C:\\AI_Automation`}</pre>
+                </div>
+                <p style={{ marginTop: '1rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  These directories are where all automated files will be stored. The system cannot access files outside this structure.
+                </p>
+              </div>
+            ),
+          },
+          {
+            id: 3,
+            title: 'Install Python Dependencies',
+            content: (
+              <div>
+                <p style={{ marginBottom: '1rem' }}>Install required Python packages:</p>
+                <div className="code-block" data-lang="CMD">
+                  <pre>{`# Navigate to project directory
+cd C:\\AI_Automation_Project
+
+# Create virtual environment (recommended)
+python -m venv venv
+
+# Activate virtual environment
+venv\\Scripts\\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Verify installation
+pip list`}</pre>
+                </div>
+                <p style={{ marginTop: '1rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  This installs FastAPI, Playwright, APScheduler, OpenPyXL, and other required packages.
+                </p>
+              </div>
+            ),
+          },
+          {
+            id: 4,
+            title: 'Install Playwright Browsers',
+            content: (
+              <div>
+                <p style={{ marginBottom: '1rem' }}>Install Chromium browser for automation:</p>
+                <div className="code-block" data-lang="CMD">
+                  <pre>{`# Install Playwright browsers
+playwright install chromium
+
+# Verify installation
+playwright --version`}</pre>
+                </div>
+                <p style={{ marginTop: '1rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  This downloads Chromium (~150MB) which Playwright will control for web automation.
+                </p>
+              </div>
+            ),
+          },
+          {
+            id: 5,
+            title: 'Install and Configure Ollama',
+            content: (
+              <div>
+                <p style={{ marginBottom: '1rem' }}>Download and set up Ollama for local AI:</p>
+                <div className="code-block" data-lang="CMD">
+                  <pre>{`# Download Ollama from https://ollama.ai
+# Install the Windows version
+
+# After installation, pull a model
+ollama pull llama3.2
+
+# Verify Ollama is running
+ollama list
+
+# Start Ollama service (runs in background)
+ollama serve`}</pre>
+                </div>
+                <div className="alert alert-info" style={{ marginTop: '1rem', marginBottom: 0 }}>
+                  <p style={{ fontSize: '0.875rem', marginBottom: 0 }}>
+                    llama3.2 requires ~2GB RAM. On 16GB RAM without GPU, expect 5-10 tokens/second.
+                    For faster performance, use smaller models: <code>ollama pull phi-2</code> or <code>ollama pull tinyllama</code>
+                  </p>
+                </div>
+              </div>
+            ),
+          },
+          {
+            id: 6,
+            title: 'Configure Environment Variables',
+            content: (
+              <div>
+                <p style={{ marginBottom: '1rem' }}>Set up your credentials and configuration:</p>
+                <div className="code-block" data-lang="CMD">
+                  <pre>{`# Copy the template
+copy .env.example .env
+
+# Edit the .env file
+notepad .env`}</pre>
+                </div>
+                <p style={{ marginTop: '1rem', marginBottom: '1rem' }}>Fill in these values in .env:</p>
+                <div className="code-block" data-lang="ENV">
+                  <pre>{`# Email Configuration
+IMAP_SERVER=imap.gmail.com
+EMAIL_SENDER=your-agent@gmail.com
+EMAIL_PASSWORD=your-app-password
+
+# SECURITY: Whitelisted contacts (comma-separated)
+WHITELIST_CONTACTS=admin@company.com,manager@company.com,Admin,Boss
+
+# WhatsApp Configuration
+WHATSAPP_WHITELIST=Admin,Manager,Boss
+
+# AI Model
+AI_BACKEND=ollama
+DEFAULT_MODEL=llama3.2
+
+# File Paths
+ALLOWED_BASE=C:/AI_Automation`}</pre>
+                </div>
+                <div className="alert alert-warning" style={{ marginTop: '1rem', marginBottom: 0 }}>
+                  <p style={{ fontSize: '0.875rem', marginBottom: 0 }}>
+                    <strong>For Gmail:</strong> Enable IMAP in Gmail settings, then create an App Password at myaccount.google.com/apppasswords.
+                    Do NOT use your regular Gmail password.
+                  </p>
+                </div>
+              </div>
+            ),
+          },
+          {
+            id: 7,
+            title: 'First Run: WhatsApp Login',
+            content: (
+              <div>
+                <p style={{ marginBottom: '1rem' }}>Start the system and log into WhatsApp Web:</p>
+                <div className="code-block" data-lang="CMD">
+                  <pre>{`# Make sure Ollama is running (in separate terminal)
+ollama serve
+
+# In project directory, start the system
+cd C:\\AI_Automation_Project
+venv\\Scripts\\activate
+python main.py`}</pre>
+                </div>
+                <p style={{ marginTop: '1rem', marginBottom: '1rem' }}>
+                  Chrome will open automatically. You'll see the WhatsApp Web QR code.
+                </p>
+                <div className="alert alert-info" style={{ marginBottom: 0 }}>
+                  <p style={{ fontSize: '0.875rem', marginBottom: 0 }}>
+                    <strong>Action Required:</strong> Open WhatsApp on your phone, go to Settings {'>'} Linked Devices,
+                    and scan the QR code displayed in Chrome. The session will be saved for future runs.
+                  </p>
+                </div>
+              </div>
+            ),
+          },
+          {
+            id: 8,
+            title: 'Verify System Status',
+            content: (
+              <div>
+                <p style={{ marginBottom: '1rem' }}>Check that all systems are running:</p>
+                <div className="code-block" data-lang="CMD">
+                  <pre>{`# Open browser to dashboard
+# Navigate to: http://localhost:8000
+
+# Or check via command line
+curl http://localhost:8000/api/status
+
+# Test AI query
+curl -X POST "http://localhost:8000/api/ai/query?prompt=Hello"
+
+# Check file manager
+curl http://localhost:8000/api/files/list`}</pre>
+                </div>
+                <p style={{ marginTop: '1rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  All modules should show as initialized. The emergency stop button should be visible in the top-right corner.
+                </p>
+              </div>
+            ),
+          },
+          {
+            id: 9,
+            title: 'Test the Sunday Pipeline',
+            content: (
+              <div>
+                <p style={{ marginBottom: '1rem' }}>Manually trigger the pipeline to test:</p>
+                <div className="code-block" data-lang="CMD">
+                  <pre>{`# Trigger pipeline manually
+curl -X POST http://localhost:8000/api/automation/run-pipeline
+
+# Check logs
+type C:\\AI_Automation\\Logs\\server.log`}</pre>
+                </div>
+                <p style={{ marginTop: '1rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  The pipeline will run through all 8 steps. On CPU-only (16GB RAM, no GPU), expect 15-25 minutes total.
+                </p>
+                <div className="alert alert-info" style={{ marginTop: '1rem', marginBottom: 0 }}>
+                  <p style={{ fontSize: '0.875rem', marginBottom: 0 }}>
+                    <strong>Timing Breakdown:</strong> Research (45s) + Scrape (25s) + AI Analysis (2.5 min) +
+                    Report (5s) + Styling (5s) + Images (20s) + Summary (30s) + Send (30s) = ~15-25 minutes
+                  </p>
+                </div>
+              </div>
+            ),
+          },
+          {
+            id: 10,
+            title: 'Set Up Auto-Start (Optional)',
+            content: (
+              <div>
+                <p style={{ marginBottom: '1rem' }}>Configure the system to start automatically on Windows boot:</p>
+                <div className="code-block" data-lang="CMD">
+                  <pre>{`# Create startup batch file
+echo @echo off > C:\\AI_Automation_Project\\start.bat
+echo cd C:\\AI_Automation_Project >> C:\\AI_Automation_Project\\start.bat
+echo call venv\\Scripts\\activate >> C:\\AI_Automation_Project\\start.bat
+echo start /b ollama serve {'>>'} C:\\AI_Automation_Project\\start.bat
+echo timeout /t 5 {'>>'} C:\\AI_Automation_Project\\start.bat
+echo python main.py {'>>'} C:\\AI_Automation_Project\\start.bat
+
+# Add to Windows startup
+# Press Win+R, type: shell:startup
+# Copy start.bat shortcut to the startup folder`}</pre>
+                </div>
+                <p style={{ marginTop: '1rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  The system will now start automatically when Windows boots. Ollama starts first, then the main app after a 5-second delay.
+                </p>
+              </div>
+            ),
+          },
+        ].map((step) => (
+          <div
             key={step.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: step.id * 0.05 }}
-            className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden"
+            style={{
+              background: 'var(--bg-secondary)',
+              border: `1px solid ${completedSteps.has(step.id) ? 'var(--success)' : 'var(--border)'}`,
+              overflow: 'hidden',
+            }}
           >
-            {/* Step Header */}
             <button
               onClick={() => setExpandedStep(expandedStep === step.id ? null : step.id)}
-              className="w-full flex items-center gap-4 p-4 text-left hover:bg-gray-800/50 transition-colors"
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1.5rem',
+                padding: '1.5rem',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+                color: 'var(--text-primary)',
+              }}
             >
               <button
                 onClick={(e) => { e.stopPropagation(); toggleStep(step.id); }}
-                className="flex-shrink-0"
-              >
-                {completedSteps.has(step.id) ? (
-                  <CheckCircle2 size={22} className="text-emerald-400" />
-                ) : (
-                  <Circle size={22} className="text-gray-600" />
-                )}
-              </button>
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                completedSteps.has(step.id) ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-800 text-gray-400'
-              }`}>
-                {step.icon}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white">
-                  Step {step.id}: {step.title}
-                </p>
-                <p className="text-xs text-gray-400 truncate">{step.description}</p>
+                style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  border: `2px solid ${completedSteps.has(step.id) ? 'var(--success)' : 'var(--border)'}`,
+                  background: completedSteps.has(step.id) ? 'var(--success)' : 'transparent',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                }}
+              />
+              <div style={{ flex: 1 }}>
+                <h3 style={{ fontSize: '1.125rem', marginBottom: '0.25rem' }}>
+                  STEP {step.id}: {step.title}
+                </h3>
               </div>
             </button>
 
-            {/* Expanded Content */}
             {expandedStep === step.id && (
-              <div className="px-4 pb-4 space-y-3 border-t border-gray-800 pt-3">
-                {step.commands && (
-                  <div className="bg-gray-950 rounded-lg p-3 overflow-x-auto">
-                    <pre className="text-xs text-gray-300 font-mono leading-relaxed">
-                      {step.commands.map((cmd, i) => (
-                        <div key={i} className={cmd.startsWith('#') ? 'text-gray-500' : cmd === '' ? 'h-2' : 'text-emerald-300'}>
-                          {cmd}
-                        </div>
-                      ))}
-                    </pre>
-                  </div>
-                )}
-                {step.notes && step.notes.length > 0 && (
-                  <div className="space-y-1.5">
-                    {step.notes.map((note, i) => (
-                      <div key={i} className="flex items-start gap-2">
-                        <span className="text-[10px] text-amber-400 mt-1">●</span>
-                        <p className="text-xs text-gray-400">{note}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <div style={{ padding: '0 1.5rem 1.5rem 1.5rem', borderTop: '1px solid var(--border)' }}>
+                <div style={{ paddingTop: '1.5rem' }}>{step.content}</div>
               </div>
             )}
-          </motion.div>
+          </div>
         ))}
+      </div>
+
+      {/* Final Notes */}
+      <div style={{ marginTop: '3rem' }}>
+        <h2>SYSTEM IS READY</h2>
+        <p style={{ color: 'var(--text-secondary)' }}>
+          Once all steps are complete, your AI Automation Hub is fully operational.
+          The system runs on localhost:8000 with all security measures active.
+        </p>
+        <div className="alert alert-success">
+          <p style={{ marginBottom: '0.5rem' }}>SECURITY STATUS</p>
+          <ul style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', paddingLeft: '1.5rem', marginBottom: 0 }}>
+            <li>File operations restricted to C:/AI_Automation/</li>
+            <li>Only whitelisted contacts can trigger actions</li>
+            <li>Emergency stop button available at all times</li>
+            <li>All operations logged to C:/AI_Automation/Logs/</li>
+          </ul>
+        </div>
       </div>
     </div>
   );

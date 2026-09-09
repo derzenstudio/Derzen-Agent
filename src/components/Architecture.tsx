@@ -1,244 +1,229 @@
-import { motion } from 'framer-motion';
-import { Globe, Brain, Mail, MessageCircle, CalendarClock, HardDrive, Monitor } from 'lucide-react';
-
 export default function Architecture() {
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-white">System Architecture</h1>
-        <p className="text-gray-400 mt-1">
-          How the AI Automation Hub components interact
-        </p>
+    <div>
+      <h1>SYSTEM ARCHITECTURE</h1>
+      <p style={{ color: 'var(--text-secondary)', marginBottom: '3rem' }}>
+        Complete overview of how all components interact in the AI Automation Hub
+      </p>
+
+      {/* Core Architecture */}
+      <h2>CORE ARCHITECTURE</h2>
+      <div className="code-block" data-lang="DIAGRAM" style={{ marginBottom: '3rem' }}>
+        <pre>{`
+┌─────────────────────────────────────────────────────────────────┐
+│                    AI AUTOMATION HUB (FastAPI)                    │
+│                         localhost:8000                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
+│  │   PLAYWRIGHT │  │  AI MANAGER  │  │   TASK SCHEDULER     │  │
+│  │   BROWSER    │  │  (Ollama)    │  │   (APScheduler)      │  │
+│  │              │  │              │  │                      │  │
+│  │ • Chrome     │  │ • llama3.2   │  │ • Sunday 9AM         │  │
+│  │   Control    │  │ • phi-2      │  │ • Email Poll (30s)   │  │
+│  │ • Scraping   │  │ • Analysis   │  │ • WA Poll (5s)       │  │
+│  │ • Downloads  │  │ • Summaries  │  │                      │  │
+│  └──────────────┘  └──────────────┘  └──────────────────────┘  │
+│                                                                   │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
+│  │   EMAIL      │  │  WHATSAPP    │  │   FILE MANAGER       │  │
+│  │   LISTENER   │  │  LISTENER    │  │   (Sandboxed)        │  │
+│  │              │  │              │  │                      │  │
+│  │ • IMAP Poll  │  │ • Web Auto   │  │ • C:/AI_Automation/  │  │
+│  │ • Whitelist  │  │ • Whitelist  │  │ • Downloads/         │  │
+│  │ • SMTP Reply │  │ • Commands   │  │ • Reports/           │  │
+│  └──────────────┘  └──────────────┘  │ • Models/            │  │
+│                                       │ • Assets/            │  │
+│                                       └──────────────────────┘  │
+│                                                                   │
+└─────────────────────────────────────────────────────────────────┘
+        `}</pre>
       </div>
 
-      {/* Architecture Diagram */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-8">
-        <div className="relative">
-          {/* Central Hub */}
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10"
-          >
-            <div className="w-32 h-32 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-              <div className="text-center">
-                <Monitor size={28} className="text-white mx-auto mb-1" />
-                <p className="text-[10px] font-bold text-white">FastAPI</p>
-                <p className="text-[8px] text-emerald-100">Core Hub</p>
-              </div>
-            </div>
-          </motion.div>
+      {/* Security Architecture */}
+      <h2>SECURITY ARCHITECTURE</h2>
+      <div style={{ marginBottom: '3rem' }}>
+        <h3>1. File System Sandboxing</h3>
+        <div className="alert alert-warning">
+          <p style={{ marginBottom: '0.5rem' }}>CRITICAL SECURITY MEASURE</p>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 0 }}>
+            All file operations are restricted to C:/AI_Automation/ and its subdirectories.
+            The FileManager class validates every path operation against an allowed list.
+            Any attempt to access files outside the sandbox is blocked and logged.
+          </p>
+        </div>
+        <div className="code-block" data-lang="PYTHON">
+          <pre>{`# Security: Path validation in file_manager.py
+ALLOWED_BASE = Path("C:/AI_Automation")
 
-          {/* Module nodes */}
-          <div className="grid grid-cols-3 gap-8 relative">
-            {/* Top row */}
-            <ModuleNode
-              icon={<Globe size={20} />}
-              title="Playwright"
-              subtitle="Chrome Automation"
-              color="blue"
-              delay={0.1}
-            />
-            <div /> {/* Center spacer */}
-            <ModuleNode
-              icon={<Brain size={20} />}
-              title="AI Manager"
-              subtitle="Ollama / Transformers"
-              color="purple"
-              delay={0.2}
-            />
+def validate_path(requested_path: str) -> Path:
+    """Ensure path is within allowed directory."""
+    resolved = (ALLOWED_BASE / requested_path).resolve()
+    if not str(resolved).startswith(str(ALLOWED_BASE)):
+        raise SecurityError(
+            f"Path traversal blocked: {requested_path}"
+        )
+    return resolved`}</pre>
+        </div>
 
-            {/* Middle row */}
-            <ModuleNode
-              icon={<Mail size={20} />}
-              title="Email Listener"
-              subtitle="IMAP Monitoring"
-              color="orange"
-              delay={0.3}
-            />
-            <div /> {/* Center - hub is here */}
-            <ModuleNode
-              icon={<MessageCircle size={20} />}
-              title="WhatsApp"
-              subtitle="Web Automation"
-              color="green"
-              delay={0.4}
-            />
+        <h3 style={{ marginTop: '2rem' }}>2. Contact Whitelist Enforcement</h3>
+        <div className="alert alert-warning">
+          <p style={{ marginBottom: '0.5rem' }}>CRITICAL SECURITY MEASURE</p>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 0 }}>
+            Both email and WhatsApp listeners enforce strict whitelisting.
+            Messages from non-whitelisted contacts are logged but ignored.
+            No commands are processed from unknown senders.
+          </p>
+        </div>
+        <div className="code-block" data-lang="PYTHON">
+          <pre>{`# Security: Whitelist enforcement in listeners.py
+WHITELIST = os.getenv("WHITELIST_CONTACTS", "").split(",")
 
-            {/* Bottom row */}
-            <ModuleNode
-              icon={<CalendarClock size={20} />}
-              title="Scheduler"
-              subtitle="APScheduler"
-              color="amber"
-              delay={0.5}
-            />
-            <div /> {/* Center spacer */}
-            <ModuleNode
-              icon={<HardDrive size={20} />}
-              title="File Manager"
-              subtitle="Windows FS"
-              color="indigo"
-              delay={0.6}
-            />
-          </div>
+def is_authorized(sender: str) -> bool:
+    """Check if sender is in whitelist."""
+    sender_clean = sender.strip().lower()
+    return sender_clean in [w.strip().lower() for w in WHITELIST]
+
+# Every incoming message goes through this check
+if not is_authorized(message.sender):
+    logger.warning(f"BLOCKED: Unauthorized sender: {message.sender}")
+    return  # Silently ignore`}</pre>
+        </div>
+
+        <h3 style={{ marginTop: '2rem' }}>3. Emergency Stop System</h3>
+        <div className="alert alert-warning">
+          <p style={{ marginBottom: '0.5rem' }}>CRITICAL SECURITY MEASURE</p>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 0 }}>
+            The emergency stop button immediately halts all automation tasks,
+            closes browser instances, stops listeners, and prevents new commands
+            from being processed until manually restarted.
+          </p>
+        </div>
+        <div className="code-block" data-lang="PYTHON">
+          <pre>{`# Security: Emergency stop in main.py
+emergency_stop = Event()
+
+@app.post("/api/emergency-stop")
+async def trigger_emergency_stop():
+    """Immediately halt all automation."""
+    emergency_stop.set()
+    
+    # Stop scheduler
+    scheduler.shutdown(wait=False)
+    
+    # Close browser
+    await browser.cleanup()
+    
+    # Stop listeners
+    email_listener.stop()
+    whatsapp_listener.stop()
+    
+    logger.critical("EMERGENCY STOP ACTIVATED")
+    return {"status": "stopped"}`}</pre>
         </div>
       </div>
 
       {/* Data Flow */}
-      <div>
-        <h2 className="text-lg font-semibold text-white mb-4">Data Flow</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FlowCard
-            title="Event-Driven Flow"
-            steps={[
-              'Email/WhatsApp message received',
-              'Whitelist check passes',
-              'AI parses the command',
-              'Appropriate task triggered',
-              'Results sent back to sender',
-            ]}
-            color="green"
-          />
-          <FlowCard
-            title="Scheduled Pipeline Flow"
-            steps={[
-              'Cron trigger fires (Sun 9 AM)',
-              'Chrome opens research tabs',
-              'Data scraped & formatted to CSV',
-              'AI model analyzes & filters',
-              'Report generated with styling',
-              'Images fetched from Drive',
-              'Summary created by AI',
-              'Sent via Email & WhatsApp',
-            ]}
-            color="amber"
-          />
+      <h2>DATA FLOW: SUNDAY PIPELINE</h2>
+      <div className="timeline" style={{ marginBottom: '3rem' }}>
+        <div className="timeline-item">
+          <div className="timeline-time">09:00:00</div>
+          <div className="timeline-title">Scheduler Trigger</div>
+          <div className="timeline-desc">APScheduler fires the Sunday pipeline job</div>
         </div>
-      </div>
-
-      {/* Directory Structure */}
-      <div>
-        <h2 className="text-lg font-semibold text-white mb-4">Project Structure</h2>
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-          <pre className="text-sm text-gray-300 font-mono leading-relaxed overflow-x-auto">
-{`AI-Automation-Hub/
-├── main.py                  # FastAPI server & scheduler
-├── automation.py            # Playwright browser automation
-├── ai_manager.py            # Local AI model management
-├── email_listener.py        # IMAP email listener
-├── whatsapp_listener.py     # WhatsApp Web listener
-├── file_manager.py          # Local file management
-├── requirements.txt         # Python dependencies
-├── .env                     # Environment config
-├── .env.example             # Environment template
-├── static/
-│   ├── index.html           # Dashboard UI
-│   ├── style.css            # Dashboard styles
-│   └── app.js               # Dashboard JavaScript
-├── setup/
-│   └── setup_guide.py       # Automated setup script
-└── C:/AI_Automation/        # Runtime data (created at runtime)
-    ├── Downloads/
-    ├── Reports/
-    ├── Models/
-    ├── Assets/
-    ├── Logs/
-    ├── BrowserData/
-    └── Screenshots/`}
-          </pre>
+        <div className="timeline-item">
+          <div className="timeline-time">09:00:01 - 09:00:45</div>
+          <div className="timeline-title">Research Phase</div>
+          <div className="timeline-desc">Playwright opens 3 tabs (arXiv, HuggingFace, GitHub) and searches for AI trends</div>
+        </div>
+        <div className="timeline-item">
+          <div className="timeline-time">09:00:46 - 09:01:10</div>
+          <div className="timeline-title">Data Scraping</div>
+          <div className="timeline-desc">Extract titles, descriptions, and metadata from all sources</div>
+        </div>
+        <div className="timeline-item">
+          <div className="timeline-time">09:01:11 - 09:03:30</div>
+          <div className="timeline-title">AI Analysis (CPU: ~2.5 min)</div>
+          <div className="timeline-desc">Ollama llama3.2 analyzes 50 items, assigns relevance scores, identifies themes</div>
+        </div>
+        <div className="timeline-item">
+          <div className="timeline-time">09:03:31 - 09:03:35</div>
+          <div className="timeline-title">Report Generation</div>
+          <div className="timeline-desc">OpenPyXL creates formatted Excel report with filtered data</div>
+        </div>
+        <div className="timeline-item">
+          <div className="timeline-time">09:03:36 - 09:03:40</div>
+          <div className="timeline-title">Brand Styling</div>
+          <div className="timeline-desc">Apply company colors, fonts, and formatting rules</div>
+        </div>
+        <div className="timeline-item">
+          <div className="timeline-time">09:03:41 - 09:04:00</div>
+          <div className="timeline-title">Image Integration</div>
+          <div className="timeline-desc">Download relevant images from Google Drive brand assets folder</div>
+        </div>
+        <div className="timeline-item">
+          <div className="timeline-time">09:04:01 - 09:04:30</div>
+          <div className="timeline-title">Summary Generation (CPU: ~30s)</div>
+          <div className="timeline-desc">AI creates executive summary in HTML format</div>
+        </div>
+        <div className="timeline-item">
+          <div className="timeline-time">09:04:31 - 09:05:00</div>
+          <div className="timeline-title">Distribution</div>
+          <div className="timeline-desc">Send summary via Email (SMTP) and WhatsApp Web automation</div>
         </div>
       </div>
 
       {/* Communication Protocols */}
-      <div>
-        <h2 className="text-lg font-semibold text-white mb-4">Communication Protocols</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <ProtocolCard
-            title="HTTP/WebSocket"
-            description="FastAPI serves the dashboard UI and provides REST APIs. WebSocket enables real-time status updates to the UI."
-            endpoints={['GET /api/status', 'POST /api/ai/query', 'WS /ws']}
-          />
-          <ProtocolCard
-            title="IMAP/SMTP"
-            description="Email listener uses IMAP to monitor inbox and SMTP to send replies. Runs on a continuous polling loop."
-            endpoints={['IMAP :993 (SSL)', 'SMTP :587 (TLS)', 'Poll every 30s']}
-          />
-          <ProtocolCard
-            title="Playwright/CDP"
-            description="Chrome DevTools Protocol via Playwright for browser automation. Persistent context maintains sessions."
-            endpoints={['Chrome CDP', 'WhatsApp Web', 'Google Drive']}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ModuleNode({ icon, title, subtitle, color, delay }: {
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  color: string;
-  delay: number;
-}) {
-  const colorMap: Record<string, string> = {
-    blue: 'from-blue-500/20 to-blue-600/20 border-blue-500/30 text-blue-400',
-    purple: 'from-purple-500/20 to-purple-600/20 border-purple-500/30 text-purple-400',
-    orange: 'from-orange-500/20 to-orange-600/20 border-orange-500/30 text-orange-400',
-    green: 'from-green-500/20 to-green-600/20 border-green-500/30 text-green-400',
-    amber: 'from-amber-500/20 to-amber-600/20 border-amber-500/30 text-amber-400',
-    indigo: 'from-indigo-500/20 to-indigo-600/20 border-indigo-500/30 text-indigo-400',
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay }}
-      className={`flex flex-col items-center gap-2 p-4 rounded-xl bg-gradient-to-b border ${colorMap[color]}`}
-    >
-      {icon}
-      <p className="text-xs font-semibold text-white">{title}</p>
-      <p className="text-[10px] text-gray-400">{subtitle}</p>
-    </motion.div>
-  );
-}
-
-function FlowCard({ title, steps, color }: { title: string; steps: string[]; color: string }) {
-  const borderColor = color === 'green' ? 'border-green-500/20' : 'border-amber-500/20';
-  const dotColor = color === 'green' ? 'bg-green-400' : 'bg-amber-400';
-
-  return (
-    <div className={`bg-gray-900 border ${borderColor} rounded-xl p-5`}>
-      <h3 className="text-sm font-semibold text-white mb-3">{title}</h3>
-      <div className="space-y-2">
-        {steps.map((step, i) => (
-          <div key={i} className="flex items-center gap-3">
-            <div className={`w-1.5 h-1.5 rounded-full ${dotColor} flex-shrink-0`} />
-            <span className="text-xs text-gray-300">{step}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ProtocolCard({ title, description, endpoints }: {
-  title: string;
-  description: string;
-  endpoints: string[];
-}) {
-  return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-      <h3 className="text-sm font-semibold text-white mb-2">{title}</h3>
-      <p className="text-xs text-gray-400 mb-3">{description}</p>
-      <div className="space-y-1">
-        {endpoints.map((ep) => (
-          <code key={ep} className="block text-[10px] text-emerald-400 bg-gray-800 px-2 py-1 rounded font-mono">
-            {ep}
-          </code>
-        ))}
+      <h2>COMMUNICATION PROTOCOLS</h2>
+      <div className="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Protocol</th>
+              <th>Port</th>
+              <th>Purpose</th>
+              <th>Security</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>HTTP/REST</td>
+              <td>8000</td>
+              <td>Dashboard API and WebSocket</td>
+              <td>Localhost only (127.0.0.1)</td>
+            </tr>
+            <tr>
+              <td>IMAP</td>
+              <td>993</td>
+              <td>Email inbox monitoring</td>
+              <td>SSL/TLS encryption</td>
+            </tr>
+            <tr>
+              <td>SMTP</td>
+              <td>587</td>
+              <td>Email sending</td>
+              <td>TLS encryption</td>
+            </tr>
+            <tr>
+              <td>HTTP (Ollama)</td>
+              <td>11434</td>
+              <td>Local AI model inference</td>
+              <td>Localhost only</td>
+            </tr>
+            <tr>
+              <td>HTTPS (WhatsApp)</td>
+              <td>443</td>
+              <td>WhatsApp Web automation</td>
+              <td>End-to-end encrypted</td>
+            </tr>
+            <tr>
+              <td>CDP (Chrome)</td>
+              <td>Dynamic</td>
+              <td>Browser DevTools Protocol</td>
+              <td>Local IPC only</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   );
