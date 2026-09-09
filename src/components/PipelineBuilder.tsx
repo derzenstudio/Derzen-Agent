@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback } from 'react';
+import {useState, useRef, useCallback, useEffect } from 'react';
+import { api, type RunReport } from '../api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Position { x: number; y: number; }
@@ -257,6 +258,10 @@ export default function PipelineBuilder() {
   const [history, setHistory] = useState<PipelineNode[][]>([[]]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [showHint, setShowHint] = useState<string | null>(null);
+  const [currentPipelineId, setCurrentPipelineId] = useState<string | null>(null);
+  const [pipelineSchedule, setPipelineSchedule] = useState('');
+  const [runReport, setRunReport] = useState<RunReport | null>(null);
+  const [isRunning, setIsRunning] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const nodeIdCounter = useRef(0);
 
@@ -495,34 +500,41 @@ export default function PipelineBuilder() {
     pushHistory([]);
   };
 
-  const savePipeline = () => {
-    if (!pipelineName.trim()) {
-      alert('Please give your pipeline a name first.');
-      return;
+  const savePipeline = async () => {
+    if (!pipelineName.trim()) { alert('Please name your pipeline first.'); return; }
+    try {
+      const saved = await api.savePipeline({
+        id: currentPipelineId || undefined,
+        name: pipelineName,
+        description: pipelineDesc,
+        nodes,
+        schedule: pipelineSchedule || undefined,
+      });
+      setCurrentPipelineId(saved.id);
+      await refreshSaved();
+      alert('Pipeline saved.');
+    } catch (err) {
+      alert('Could not save: ' + (err as Error).message);
     }
-    if (nodes.length === 0) {
-      alert('Your pipeline is empty. Add some steps first.');
-      return;
-    }
-
-    const hasStart = nodes.some(n => n.type === 'start');
-    const hasEnd = nodes.some(n => n.type === 'end');
-    if (!hasStart || !hasEnd) {
-      alert('Every pipeline needs a START HERE step and a FINISH step.');
-      return;
-    }
-
-    const pipeline: Pipeline = {
-      id: `pipeline_${Date.now()}`,
-      name: pipelineName,
-      description: pipelineDesc,
-      nodes,
-      created: new Date().toISOString(),
-    };
-
-    setSavedPipelines(prev => [...prev, pipeline]);
-    alert(`Saved! Your pipeline "${pipelineName}" is ready to run.`);
   };
+  
+  const refreshSaved = async () => {
+    try { setSavedPipelines(await api.listPipelines()); } catch { /* backend offline */ }
+  };
+  
+  const runCurrentPipeline = async () => {
+    setIsRunning(true);
+    try {
+      const report = await api.runPipeline({ name: pipelineName, nodes });
+      setRunReport(report);
+    } catch (err) {
+      alert('Run failed: ' + (err as Error).message);
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  useEffect(() => { refreshSaved(); }, []);
 
   const loadTemplate = (template: typeof TEMPLATES[0]) => {
     setNodes(template.nodes.map(n => ({ ...n })));
@@ -545,170 +557,18 @@ export default function PipelineBuilder() {
   const generateFromPrompt = async () => {
     if (!promptInput.trim()) return;
     setIsGenerating(true);
-
-    // Simulate AI generation
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    const prompt = promptInput.toLowerCase();
-    const generatedNodes: PipelineNode[] = [];
-    let y = 50;
-    const spacing = 150;
-    let id = 0;
-
-    // Always start with START
-    generatedNodes.push({
-      id: `step_${++id}`,
-      type: 'start',
-      position: { x: 300, y },
-      config: {},
-      connections: {},
-    });
-
-    if (prompt.includes('scrape') || prompt.includes('read') || prompt.includes('website') || prompt.includes('check')) {
-      y += spacing;
-      generatedNodes.push({
-        id: `step_${++id}`,
-        type: 'web_scrape',
-        position: { x: 300, y },
-        config: { urls: 'https://example.com' },
-        connections: {},
-      });
-      generatedNodes[generatedNodes.length - 2].connections.next = generatedNodes[generatedNodes.length - 1].id;
+    try {
+      const pipeline = await api.generatePipeline(promptInput);
+      setNodes(pipeline.nodes || []);
+      setPipelineName(pipeline.name || 'Generated Pipeline');
+      setPipelineDesc(pipeline.description || '');
+      setCurrentPipelineId(null);
+      setViewMode('builder');
+    } catch (err) {
+      alert('Could not generate via the backend: ' + (err as Error).message);
+    } finally {
+      setIsGenerating(false);
     }
-
-    if (prompt.includes('social') || prompt.includes('twitter') || prompt.includes('instagram')) {
-      y += spacing;
-      generatedNodes.push({
-        id: `step_${++id}`,
-        type: 'social_analyze',
-        position: { x: 300, y },
-        config: { platform: 'twitter', query: 'trending topics', post_count: 10, analyze_sentiment: true },
-        connections: {},
-      });
-      generatedNodes[generatedNodes.length - 2].connections.next = generatedNodes[generatedNodes.length - 1].id;
-    }
-
-    if (prompt.includes('chatgpt') || prompt.includes('claude') || prompt.includes('gemini') || prompt.includes('online ai')) {
-      y += spacing;
-      generatedNodes.push({
-        id: `step_${++id}`,
-        type: 'ai_browser',
-        position: { x: 300, y },
-        config: { ai_service: 'chatgpt', prompt: 'Analyze the data', wait_seconds: 30, conversation_mode: false },
-        connections: {},
-      });
-      generatedNodes[generatedNodes.length - 2].connections.next = generatedNodes[generatedNodes.length - 1].id;
-    } else if (prompt.includes('ai') || prompt.includes('ask') || prompt.includes('analyze') || prompt.includes('think') || prompt.includes('summarize')) {
-      y += spacing;
-      generatedNodes.push({
-        id: `step_${++id}`,
-        type: 'ai_query',
-        position: { x: 300, y },
-        config: { prompt: 'Analyze the data and provide insights' },
-        connections: {},
-      });
-      generatedNodes[generatedNodes.length - 2].connections.next = generatedNodes[generatedNodes.length - 1].id;
-    }
-
-    if (prompt.includes('if') || prompt.includes('check') || prompt.includes('decide') || prompt.includes('condition')) {
-      y += spacing;
-      generatedNodes.push({
-        id: `step_${++id}`,
-        type: 'branch',
-        position: { x: 300, y },
-        config: { condition: '{{ai_answer}} != ""' },
-        connections: {},
-      });
-      generatedNodes[generatedNodes.length - 2].connections.next = generatedNodes[generatedNodes.length - 1].id;
-
-      y += spacing;
-      generatedNodes.push({
-        id: `step_${++id}`,
-        type: 'ai_query',
-        position: { x: 100, y },
-        config: { prompt: 'Generate a detailed response' },
-        connections: {},
-      });
-      generatedNodes[generatedNodes.length - 2].connections.true = generatedNodes[generatedNodes.length - 1].id;
-
-      generatedNodes.push({
-        id: `step_${++id}`,
-        type: 'wait',
-        position: { x: 500, y },
-        config: { seconds: 60 },
-        connections: {},
-      });
-      generatedNodes[generatedNodes.length - 3].connections.false = generatedNodes[generatedNodes.length - 1].id;
-    }
-
-    if (prompt.includes('email')) {
-      y += spacing;
-      generatedNodes.push({
-        id: `step_${++id}`,
-        type: 'email_send',
-        position: { x: 300, y },
-        config: { to: 'recipient@example.com', subject: 'Report', body: '{{ai_answer}}' },
-        connections: {},
-      });
-      generatedNodes[generatedNodes.length - 2].connections.next = generatedNodes[generatedNodes.length - 1].id;
-    }
-
-    if (prompt.includes('whatsapp') || prompt.includes('message') || prompt.includes('alert')) {
-      y += spacing;
-      generatedNodes.push({
-        id: `step_${++id}`,
-        type: 'whatsapp_send',
-        position: { x: 300, y },
-        config: { contact: 'Boss', message: '{{ai_answer}}' },
-        connections: {},
-      });
-      generatedNodes[generatedNodes.length - 2].connections.next = generatedNodes[generatedNodes.length - 1].id;
-    }
-
-    if (prompt.includes('save') || prompt.includes('file') || prompt.includes('store')) {
-      y += spacing;
-      generatedNodes.push({
-        id: `step_${++id}`,
-        type: 'file_save',
-        position: { x: 300, y },
-        config: { filename: 'output.txt', content: '{{ai_answer}}' },
-        connections: {},
-      });
-      generatedNodes[generatedNodes.length - 2].connections.next = generatedNodes[generatedNodes.length - 1].id;
-    }
-
-    // Default: if nothing specific matched, add an AI query
-    if (generatedNodes.length === 1) {
-      y += spacing;
-      generatedNodes.push({
-        id: `step_${++id}`,
-        type: 'ai_query',
-        position: { x: 300, y },
-        config: { prompt: promptInput },
-        connections: {},
-      });
-      generatedNodes[0].connections.next = generatedNodes[1].id;
-    }
-
-    // Always end with END
-    y += spacing;
-    generatedNodes.push({
-      id: `step_${++id}`,
-      type: 'end',
-      position: { x: 300, y },
-      config: {},
-      connections: {},
-    });
-    generatedNodes[generatedNodes.length - 2].connections.next = generatedNodes[generatedNodes.length - 1].id;
-
-    setNodes(generatedNodes);
-    nodeIdCounter.current = id;
-    setPipelineName(`Pipeline: ${promptInput.slice(0, 40)}`);
-    setPipelineDesc(`Generated from: "${promptInput}"`);
-    setIsGenerating(false);
-    setPromptInput('');
-    setViewMode('builder');
-    pushHistory(generatedNodes);
   };
 
   // ─── Render: Welcome Screen ──────────────────────────────────────────────
@@ -1603,7 +1463,7 @@ export default function PipelineBuilder() {
             </span>
           )}
         </div>
-        <button className="btn btn-secondary" onClick={() => alert('Testing pipeline... (demo mode)')}>
+        <button className="btn btn-secondary" onClick={savePipeline}>
           TEST PIPELINE
         </button>
         <button className="btn btn-primary" onClick={savePipeline}>
@@ -1611,10 +1471,10 @@ export default function PipelineBuilder() {
         </button>
         <button
           className="btn btn-primary"
-          onClick={() => alert('Running pipeline... (demo mode)')}
+          onClick={runCurrentPipeline}
           style={{ background: 'var(--success)' }}
         >
-          RUN NOW
+          {isRunning ? 'RUNNING…' : 'RUN NOW'}
         </button>
       </div>
     </div>
