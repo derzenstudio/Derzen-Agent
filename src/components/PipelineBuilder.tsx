@@ -161,6 +161,31 @@ const NODE_TYPES: NodeTypeDef[] = [
       { key: 'condition', label: 'What should be true to go the YES path?', type: 'text', placeholder: 'Example: {{ai_answer}} != ""' },
     ],
   },
+  {
+    type: 'report_generate',
+    label: 'WRITE A REPORT',
+    color: '#16a085',
+    plainEnglish: 'summarise the results so far into a report',
+    config: { title: 'Research report', sources: '', filename: '', include_appendix: true },
+    configFields: [
+      { key: 'title', type: 'text', placeholder: 'Report title' },
+      { key: 'sources', type: 'textarea', placeholder: 'Optional: node ids or names, one per line (blank = everything)' },
+      { key: 'filename', type: 'text', placeholder: 'Optional file name (auto if blank)' },
+      { key: 'include_appendix', type: 'text', placeholder: 'true / false' },
+    ],
+  },
+  {
+    type: 'drive_upload',
+    label: 'SEND TO DRIVE',
+    color: '#4285f4',
+    plainEnglish: 'upload the report file to Google Drive',
+    config: { path: '', folder_id: '', name: '' },
+    configFields: [
+      { key: 'path', type: 'text', placeholder: 'File to upload (blank = latest report)' },
+      { key: 'folder_id', type: 'text', placeholder: 'Optional Drive folder id' },
+      { key: 'name', type: 'text', placeholder: 'Optional name in Drive' },
+    ],
+  },
 ];
 
 // ─── Templates (Pre-built pipelines for beginners) ───────────────────────────
@@ -227,6 +252,19 @@ const TEMPLATES: Array<{
       { id: 'n5', type: 'file_save', position: { x: 100, y: 700 }, config: { filename: 'comprehensive_research.txt', content: '{{ai_answer}}' }, connections: { next: 'n6' } },
       { id: 'n6', type: 'email_send', position: { x: 100, y: 850 }, config: { to: 'stakeholders@company.com', subject: 'Comprehensive Market Research Report', body: '{{ai_answer}}' }, connections: { next: 'n7' } },
       { id: 'n7', type: 'end', position: { x: 100, y: 1000 }, config: {}, connections: {} },
+    ],
+  },
+  {
+    id: 'market-research-report',
+    name: 'Market Research to Drive',
+    description: 'Research a topic with local AI, summarise it into a report, email the team, and upload the file to Google Drive.',
+    nodes: [
+      { id: 'start', type: 'start', position: { x: 80, y: 220 }, config: {}, connections: { next: 'research' } },
+      { id: 'research', type: 'ai_query', position: { x: 320, y: 220 }, config: { prompt: 'Give a concise market research briefing on {{topic}}: key trends, main competitors, and opportunities.' }, connections: { next: 'report' } },
+      { id: 'report', type: 'report_generate', position: { x: 560, y: 220 }, config: { title: 'Market research summary', sources: 'research', filename: '', include_appendix: true }, connections: { next: 'notify' } },
+      { id: 'notify', type: 'email_send', position: { x: 800, y: 220 }, config: { to: '', subject: 'Market research summary', body: '{{report_summary}}' }, connections: { next: 'upload' } },
+      { id: 'upload', type: 'drive_upload', position: { x: 1040, y: 220 }, config: { path: '', folder_id: '', name: '' }, connections: { next: 'end' } },
+      { id: 'end', type: 'end', position: { x: 1280, y: 220 }, config: {}, connections: {} },
     ],
   },
 ];
