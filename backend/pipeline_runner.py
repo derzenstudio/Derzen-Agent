@@ -137,7 +137,7 @@ async def _run_node(node: dict, context: Dict[str, Any]) -> Any:
             str(cfg.get("title", "Research report")),
             material,
             str(cfg.get("filename", "")).strip() or None,
-            bool(cfg.get("include_appendix", True)),
+            str(cfg.get("include_appendix", "true")).strip().lower() not in ("false", "0", "no", "off"),
         )
         context["report_text"] = result.get("report", "")
         context["report_summary"] = result.get("summary", "")
