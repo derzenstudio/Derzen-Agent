@@ -122,6 +122,43 @@ async def _run_node(node: dict, context: Dict[str, Any]) -> Any:
         return str(path)
     if ntype == "branch":
         return _truthy(str(cfg.get("condition", "")), context)
+    if ntype == "report_generate":
+        import report
+
+        # Sources: comma/newline separated node ids or friendly keys. If none
+        # are given, summarise every result produced so far.
+        raw_sources = str(cfg.get("sources", "")).replace(",", "\n")
+        keys = [k.strip() for k in raw_sources.splitlines() if k.strip()]
+        if keys:
+            material = [context.get(k) for k in keys]
+        else:
+            material = [v for k, v in context.items() if not k.endswith("_report")]
+        result = await report.generate(
+            str(cfg.get("title", "Research report")),
+            material,
+            str(cfg.get("filename", "")).strip() or None,
+            bool(cfg.get("include_appendix", True)),
+        )
+        context["report_text"] = result.get("report", "")
+        context["report_summary"] = result.get("summary", "")
+        context["report_path"] = result.get("path", "")
+        return result
+    if ntype == "drive_upload":
+        import drive
+
+        # Upload a sandboxed file to Google Drive. Defaults to the most recent
+        # report if no explicit path is provided.
+        rel = str(cfg.get("path", "")).strip() or str(context.get("report_path", "")).strip()
+        if not rel:
+            raise ValueError("drive_upload: no file path to upload.")
+        result = drive.upload(
+            rel,
+            str(cfg.get("folder_id", "")).strip() or None,
+            str(cfg.get("name", "")).strip() or None,
+        )
+        context["drive_link"] = result.get("link", "")
+        context["drive_file_id"] = result.get("id", "")
+        return result
     raise ValueError(f"Unknown node type: {ntype}")
 
 
@@ -153,6 +190,11 @@ async def run_pipeline(pipeline: dict) -> dict:
                 context["ai_response"] = result
             elif current.get("type") == "web_scrape":
                 context["scraped_data"] = result
+            elif current.get("type") == "report_generate" and isinstance(result, dict):
+                context["report"] = result.get("report", "")
+                context["summary"] = result.get("summary", "")
+            elif current.get("type") == "drive_upload" and isinstance(result, dict):
+                context["uploaded_link"] = result.get("link", "")
             detail = _summarise(result)
         except runtime.EmergencyStopped:
             status = "error"
