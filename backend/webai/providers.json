@@ -1,0 +1,181 @@
+{
+  "notes": "Selector lists are tried in order. Add a provider by copying a block and changing the id, label and url. Nothing here logs in for you.",
+  "providers": [
+    {
+      "id": "chatgpt",
+      "label": "ChatGPT",
+      "url": "https://chatgpt.com/",
+      "new_chat_url": "https://chatgpt.com/?temporary-chat=false",
+      "input": ["#prompt-textarea", "div[contenteditable='true'][data-virtualkeyboard]", "div.ProseMirror[contenteditable='true']", "textarea"],
+      "send": ["button[data-testid='send-button']", "button[aria-label*='Send prompt']", "button[aria-label*='Send']"],
+      "busy": ["button[data-testid='stop-button']", "button[aria-label*='Stop streaming']", "button[aria-label*='Stop']"],
+      "message": ["div[data-message-author-role='assistant']", "article[data-testid^='conversation-turn']"],
+      "submit_key": "Enter"
+    },
+    {
+      "id": "claude",
+      "label": "Claude",
+      "url": "https://claude.ai/new",
+      "new_chat_url": "https://claude.ai/new",
+      "input": ["div[contenteditable='true'].ProseMirror", "div[contenteditable='true']", "textarea"],
+      "send": ["button[aria-label='Send message']", "button[aria-label*='Send']"],
+      "busy": ["button[aria-label='Stop response']", "button[aria-label*='Stop']"],
+      "message": ["div[data-testid='assistant-message']", "div.font-claude-message", "div.font-claude-response"],
+      "submit_key": "Enter"
+    },
+    {
+      "id": "gemini",
+      "label": "Gemini",
+      "url": "https://gemini.google.com/app",
+      "new_chat_url": "https://gemini.google.com/app",
+      "input": ["div.ql-editor[contenteditable='true']", "rich-textarea div[contenteditable='true']", "textarea"],
+      "send": ["button.send-button", "button[aria-label*='Send']", "button[aria-label*='Kirim']"],
+      "busy": ["button[aria-label*='Stop']", "div.response-container.streaming"],
+      "message": ["message-content.model-response-text", "div.model-response-text", "message-content"],
+      "submit_key": "Enter"
+    },
+    {
+      "id": "perplexity",
+      "label": "Perplexity",
+      "url": "https://www.perplexity.ai/",
+      "new_chat_url": "https://www.perplexity.ai/",
+      "input": ["textarea[placeholder*='Ask']", "div[contenteditable='true']", "textarea"],
+      "send": ["button[aria-label='Submit']", "button[data-testid='submit-button']", "button[aria-label*='Send']"],
+      "busy": ["button[aria-label='Stop generating']", "button[aria-label*='Stop']"],
+      "message": ["div[id^='markdown-content']", "div.prose"],
+      "submit_key": "Enter"
+    },
+    {
+      "id": "copilot",
+      "label": "Microsoft Copilot",
+      "url": "https://copilot.microsoft.com/",
+      "new_chat_url": "https://copilot.microsoft.com/",
+      "input": ["textarea#userInput", "div[contenteditable='true']", "textarea"],
+      "send": ["button[title='Submit message']", "button[aria-label*='Submit']", "button[aria-label*='Send']"],
+      "busy": ["button[title='Stop']", "button[aria-label*='Stop']"],
+      "message": ["div[data-content='ai-message']", "div.space-y-3"],
+      "submit_key": "Enter"
+    },
+    {
+      "id": "grok",
+      "label": "Grok",
+      "url": "https://grok.com/",
+      "new_chat_url": "https://grok.com/",
+      "input": ["textarea[aria-label*='Ask']", "div[contenteditable='true']", "textarea"],
+      "send": ["button[type='submit']", "button[aria-label*='Submit']"],
+      "busy": ["button[aria-label*='Stop']"],
+      "message": ["div.message-bubble", "div.response-content-markdown"],
+      "submit_key": "Enter"
+    },
+    {
+      "id": "deepseek",
+      "label": "DeepSeek",
+      "url": "https://chat.deepseek.com/",
+      "new_chat_url": "https://chat.deepseek.com/",
+      "input": ["textarea#chat-input", "div[contenteditable='true']", "textarea"],
+      "send": ["div[role='button'][aria-disabled='false']", "button[type='submit']"],
+      "busy": ["div[class*='stop']", "button[aria-label*='Stop']"],
+      "message": ["div.ds-markdown", "div[class*='markdown']"],
+      "submit_key": "Enter"
+    },
+    {
+      "id": "qwen",
+      "label": "Qwen Chat",
+      "url": "https://chat.qwen.ai/",
+      "new_chat_url": "https://chat.qwen.ai/",
+      "input": ["textarea#chat-input", "div[contenteditable='true']", "textarea"],
+      "send": ["button#send-message-button", "button[type='submit']"],
+      "busy": ["button#stop-message-button", "button[aria-label*='Stop']"],
+      "message": ["div.markdown-content-container", "div[class*='markdown']"],
+      "submit_key": "Enter"
+    },
+    {
+      "id": "kimi",
+      "label": "Kimi",
+      "url": "https://www.kimi.com/",
+      "new_chat_url": "https://www.kimi.com/",
+      "input": ["div[contenteditable='true']", "textarea"],
+      "send": ["div.send-button", "button[type='submit']"],
+      "busy": ["div.stop-button", "button[aria-label*='Stop']"],
+      "message": ["div.markdown", "div[class*='segment-assistant']"],
+      "submit_key": "Enter"
+    },
+    {
+      "id": "mistral",
+      "label": "Mistral Le Chat",
+      "url": "https://chat.mistral.ai/chat",
+      "new_chat_url": "https://chat.mistral.ai/chat",
+      "input": ["textarea[name='message.text']", "div[contenteditable='true']", "textarea"],
+      "send": ["button[type='submit']", "button[aria-label*='Send']"],
+      "busy": ["button[aria-label*='Stop']"],
+      "message": ["div[data-message-author-role='assistant']", "div.prose"],
+      "submit_key": "Enter"
+    },
+    {
+      "id": "metaai",
+      "label": "Meta AI",
+      "url": "https://www.meta.ai/",
+      "new_chat_url": "https://www.meta.ai/",
+      "input": ["div[contenteditable='true']", "textarea"],
+      "send": ["div[aria-label='Send message']", "button[aria-label*='Send']"],
+      "busy": ["div[aria-label*='Stop']"],
+      "message": ["div[dir='auto']"],
+      "submit_key": "Enter"
+    },
+    {
+      "id": "huggingchat",
+      "label": "HuggingChat",
+      "url": "https://huggingface.co/chat/",
+      "new_chat_url": "https://huggingface.co/chat/",
+      "input": ["textarea[placeholder*='Ask']", "textarea"],
+      "send": ["button[type='submit']", "button[aria-label*='Send']"],
+      "busy": ["button[aria-label*='Stop']"],
+      "message": ["div.prose"],
+      "submit_key": "Enter"
+    },
+    {
+      "id": "poe",
+      "label": "Poe",
+      "url": "https://poe.com/",
+      "new_chat_url": "https://poe.com/",
+      "input": ["textarea[class*='GrowingTextArea']", "textarea"],
+      "send": ["button[data-button-send='true']", "button[aria-label*='Send']"],
+      "busy": ["button[data-button-stop='true']", "button[aria-label*='Stop']"],
+      "message": ["div[class*='Message_botMessageBubble']", "div[class*='Markdown_markdownContainer']"],
+      "submit_key": "Enter"
+    },
+    {
+      "id": "you",
+      "label": "You.com",
+      "url": "https://you.com/",
+      "new_chat_url": "https://you.com/",
+      "input": ["textarea#search-input-textarea", "textarea"],
+      "send": ["button[data-testid='search-form-submit-button']", "button[type='submit']"],
+      "busy": ["button[aria-label*='Stop']"],
+      "message": ["div[data-testid='youchat-answer-turn']", "div.prose"],
+      "submit_key": "Enter"
+    },
+    {
+      "id": "phind",
+      "label": "Phind",
+      "url": "https://www.phind.com/",
+      "new_chat_url": "https://www.phind.com/",
+      "input": ["textarea[name='q']", "textarea"],
+      "send": ["button[type='submit']"],
+      "busy": ["button[aria-label*='Stop']"],
+      "message": ["div[class*='answer']", "div.prose"],
+      "submit_key": "Enter"
+    },
+    {
+      "id": "openrouter",
+      "label": "OpenRouter Chat",
+      "url": "https://openrouter.ai/chat",
+      "new_chat_url": "https://openrouter.ai/chat",
+      "input": ["textarea[placeholder*='Start a message']", "textarea"],
+      "send": ["button[type='submit']", "button[aria-label*='Send']"],
+      "busy": ["button[aria-label*='Stop']"],
+      "message": ["div.prose", "div[class*='markdown']"],
+      "submit_key": "Enter"
+    }
+  ]
+}
